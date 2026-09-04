@@ -1,0 +1,156 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-08-24T23:15:00.000Z",
+  "__export_source": "insomnia.desktop.app:v2023.5.8",
+  "resources": [
+    {
+      "_id": "wrk_mediator_api",
+      "_type": "workspace",
+      "name": "Rocha Magazine - Mediator API",
+      "description": "Coleção de requisições CRUD para o Sistema de Gestão de Ordens de Serviço",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_mediator_base",
+      "_type": "environment",
+      "parentId": "wrk_mediator_api",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:3333/api",
+        "token": "SEU_TOKEN_JWT_AQUI"
+      }
+    },
+    {
+      "_id": "fld_auth",
+      "_type": "request_group",
+      "parentId": "wrk_mediator_api",
+      "name": "1. Autenticação"
+    },
+    {
+      "_id": "req_login",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Login (Obter Token JWT)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/auth/login",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"admin@mediator.com\",\n  \"password\": \"123456\"\n}"
+      }
+    },
+    {
+      "_id": "req_health",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Health Check",
+      "method": "GET",
+      "url": "{{ _.base_url }}/health",
+      "headers": []
+    },
+    {
+      "_id": "fld_users",
+      "_type": "request_group",
+      "parentId": "wrk_mediator_api",
+      "name": "2. Usuários (RF01)"
+    },
+    {
+      "_id": "req_create_user",
+      "_type": "request",
+      "parentId": "fld_users",
+      "name": "Criar Usuário (ADMIN)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/users",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Ana Costa\",\n  \"email\": \"ana@mediator.com\",\n  \"password\": \"123456\",\n  \"role\": \"ATTENDANT\"\n}"
+      }
+    },
+    {
+      "_id": "req_list_users",
+      "_type": "request",
+      "parentId": "fld_users",
+      "name": "Listar Usuários",
+      "method": "GET",
+      "url": "{{ _.base_url }}/users",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "fld_clients",
+      "_type": "request_group",
+      "parentId": "wrk_mediator_api",
+      "name": "3. Clientes (RF02)"
+    },
+    {
+      "_id": "req_create_client",
+      "_type": "request",
+      "parentId": "fld_clients",
+      "name": "Cadastrar Novo Cliente",
+      "method": "POST",
+      "url": "{{ _.base_url }}/clients",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Carlos Oliveira\",\n  \"cpf\": \"456.789.123-00\",\n  \"email\": \"carlos@email.com\",\n  \"phone\": \"(17) 99876-5432\",\n  \"city\": \"Viradouro\",\n  \"address\": \"Rua das Palmeiras, 120\",\n  \"notes\": \"Cliente preferencial\"\n}"
+      }
+    },
+    {
+      "_id": "req_list_clients",
+      "_type": "request",
+      "parentId": "fld_clients",
+      "name": "Listar Todos os Clientes",
+      "method": "GET",
+      "url": "{{ _.base_url }}/clients",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "req_search_clients",
+      "_type": "request",
+      "parentId": "fld_clients",
+      "name": "Buscar Clientes por Termo/Filtro",
+      "method": "GET",
+      "url": "{{ _.base_url }}/clients?search=Carlos",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    }
+  ]
+}

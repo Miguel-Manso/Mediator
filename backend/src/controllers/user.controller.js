@@ -1,44 +1,48 @@
 const bcrypt = require('bcryptjs');
 const { getPool, sql } = require('../config/db');
+const UserModel = require('../models/User.model');
+const AddressModel = require('../models/Address.model');
 
 const userController = {
-  // Listagem de colaboradores
-  async listar(req, res) {
+  // Listagem de colaboradores usando a camada Model
+  async listar(_req, res) {
     try {
-      const pool = await getPool();
-      const resultado = await pool.query(`
-        SELECT 
-          id, 
-          nome, 
-          email, 
-          cargo, 
-          status, 
-          telefone, 
-          cidade, 
-          criado_em AS criadoEm,
-          nome AS name,
-          cargo AS role,
-          telefone AS phone,
-          cidade AS city,
-          criado_em AS createdAt
-        FROM usuarios
-        ORDER BY nome ASC
-      `);
-
-      return res.status(200).json(resultado.recordset);
+      const usuarios = await UserModel.findAll();
+      return res.status(200).json(usuarios);
     } catch (erro) {
       console.error('Erro ao listar usuários:', erro);
       return res.status(500).json({ error: erro.message || 'Erro ao listar colaboradores.' });
     }
   },
 
-  // Cadastro de novo colaborador
+  // Cadastro de novo colaborador com validacoes de confirmacao de email e senha
   async criar(req, res) {
     try {
-      const { nome, email, senha, cargo, telefone, cidade } = req.body || {};
+      const {
+        nome,
+        email,
+        cpf,
+        confirmEmail,
+        confirmarEmail,
+        senha,
+        confirmSenha,
+        confirmarSenha,
+        cargo,
+        telefone,
+        logradouro,
+        numero,
+        complemento,
+        bairro,
+        cidade,
+        uf,
+        cep,
+        endereco,
+        enderecoId: enderecoIdReq,
+      } = req.body || {};
+
       const usuarioId = req.usuario?.id || req.user?.id || null;
 
-      // Validacoes manuais diretas
+      // 1. Validacao de campos obrigatorios
       if (!nome || !String(nome).trim()) {
         return res.status(400).json({ error: 'O nome do colaborador é obrigatório.' });
       }
@@ -47,76 +51,108 @@ const userController = {
         return res.status(400).json({ error: 'O e-mail do colaborador é obrigatório.' });
       }
 
-      if (!senha || String(senha).length < 6) {
-        return res.status(400).json({ error: 'A senha é obrigatória e deve ter pelo menos 6 caracteres.' });
+      const emailTratado = String(email).trim().toLowerCase();
+      const confirmacaoEmail = String(confirmEmail || confirmarEmail || '').trim().toLowerCase();
+
+      // 2. Regra de correspondencia de e-mail (se confirmacao fornecida)
+      if (confirmacaoEmail && emailTratado !== confirmacaoEmail) {
+        return res.status(400).json({
+          error: 'A confirmação de e-mail não confere com o e-mail informado.',
+        });
       }
 
-      const emailTratado = String(email).trim().toLowerCase();
-      const cargoTratado = cargo ? String(cargo).toUpperCase() : 'ATENDENTE';
+      // 3. Validacao de senha
+      if (!senha || String(senha).length < 6) {
+        return res.status(400).json({
+          error: 'A senha é obrigatória e deve ter pelo menos 6 caracteres.',
+        });
+      }
 
-      const pool = await getPool();
+      const confirmacaoSenha = String(confirmSenha || confirmarSenha || '');
 
-      // Checar duplicidade de e-mail
-      const checarUsuario = await pool
-        .request()
-        .input('email', sql.NVarChar, emailTratado)
-        .query('SELECT id FROM usuarios WHERE email = @email');
+      // 4. Regra de correspondencia de senha (se confirmacao fornecida)
+      if (confirmacaoSenha && String(senha) !== confirmacaoSenha) {
+        return res.status(400).json({
+          error: 'A confirmação de senha não confere com a senha digitada.',
+        });
+      }
 
-      if (checarUsuario.recordset.length > 0) {
+      // 5. Checar duplicidade de e-mail via Model
+      const emailJaExiste = await UserModel.checkEmailExists(emailTratado);
+      if (emailJaExiste) {
         return res.status(400).json({
           error: 'Este endereço de e-mail já está cadastrado para outro colaborador.',
         });
       }
 
-      // Hash da senha com custo 10
+      // 5.1 Checar duplicidade de CPF via Model se fornecido
+      if (cpf && String(cpf).trim()) {
+        const cpfTratado = String(cpf).trim();
+        const cpfJaExiste = await UserModel.checkCpfExists(cpfTratado);
+        if (cpfJaExiste) {
+          return res.status(400).json({
+            error: 'Este CPF já está cadastrado para outro colaborador.',
+          });
+        }
+      }
+
+      // 6. Criptografia da senha
       const senhaHash = await bcrypt.hash(String(senha), 10);
 
-      const resultadoInsercao = await pool
-        .request()
-        .input('nome', sql.NVarChar, String(nome).trim())
-        .input('email', sql.NVarChar, emailTratado)
-        .input('senha_hash', sql.NVarChar, senhaHash)
-        .input('cargo', sql.NVarChar, cargoTratado)
-        .input('telefone', telefone ? String(telefone).trim() : null)
-        .input('cidade', cidade ? String(cidade).trim() : 'Viradouro')
-        .query(`
-          INSERT INTO usuarios (id, nome, email, senha_hash, cargo, status, telefone, cidade)
-          OUTPUT inserted.id, inserted.nome, inserted.email, inserted.cargo, inserted.status, inserted.telefone, inserted.cidade, inserted.criado_em
-          VALUES (LOWER(NEWID()), @nome, @email, @senha_hash, @cargo, 'ATIVO', @telefone, @cidade)
-        `);
+      // 6.1 Criar endereco normalizado via AddressModel caso dados tenham sido informados
+      let enderecoId = enderecoIdReq || null;
+      const logradouroFinal = logradouro || endereco;
+      if (logradouroFinal || numero || bairro || cep || uf || cidade) {
+        try {
+          const enderecoCriado = await AddressModel.create({
+            logradouro: logradouroFinal ? String(logradouroFinal).trim() : 'Não informado',
+            numero: numero ? String(numero).trim() : null,
+            complemento: complemento ? String(complemento).trim() : null,
+            bairro: bairro ? String(bairro).trim() : null,
+            cidade: cidade ? String(cidade).trim() : 'Viradouro',
+            uf: uf ? String(uf).trim().toUpperCase() : 'SP',
+            cep: cep ? String(cep).trim() : null,
+          });
+          enderecoId = enderecoCriado.id;
+        } catch (erroEnd) {
+          console.warn('Falha ao registrar endereço de usuário:', erroEnd.message);
+        }
+      }
 
-      const usuario = resultadoInsercao.recordset[0];
+      // 7. Criacao atraves da camada Model
+      const usuario = await UserModel.create({
+        nome: String(nome).trim(),
+        email: emailTratado,
+        cpf: cpf ? String(cpf).trim() : null,
+        senhaHash,
+        cargo: cargo ? String(cargo).toUpperCase() : 'ATENDENTE',
+        telefone: telefone ? String(telefone).trim() : null,
+        enderecoId,
+      });
 
-      // Auditoria: registro obrigatorio em logs_sistema
+      // 8. Registro de auditoria em logs_sistema
       try {
+        const pool = await getPool();
         await pool
           .request()
           .input('usuario_id', sql.VarChar, usuarioId)
           .input('acao', sql.NVarChar, 'CRIAR_USUARIO')
           .input('entidade', sql.NVarChar, 'usuarios')
           .input('entidade_id', sql.NVarChar, usuario.id)
-          .input('detalhes', sql.NVarChar, JSON.stringify({ nome: usuario.nome, cargo: usuario.cargo, email: usuario.email }))
+          .input(
+            'detalhes',
+            sql.NVarChar,
+            JSON.stringify({ nome: usuario.nome, cargo: usuario.cargo, email: usuario.email, cpf: usuario.cpf })
+          )
           .query(`
-            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes)
-            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes)
+            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
+            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
           `);
       } catch (erroLog) {
         console.warn('Falha ao registrar log de criacao de usuario:', erroLog.message);
       }
 
-      return res.status(201).json({
-        id: usuario.id,
-        nome: usuario.nome,
-        email: usuario.email,
-        cargo: usuario.cargo,
-        status: usuario.status,
-        telefone: usuario.telefone,
-        cidade: usuario.cidade,
-        criadoEm: usuario.criado_em,
-        name: usuario.nome,
-        role: usuario.cargo,
-        createdAt: usuario.criado_em,
-      });
+      return res.status(201).json(usuario);
     } catch (erro) {
       console.error('Erro ao criar usuário:', erro);
       return res.status(500).json({ error: erro.message || 'Erro ao cadastrar colaborador.' });
@@ -127,172 +163,239 @@ const userController = {
   async atualizar(req, res) {
     try {
       const { id } = req.params;
-      const { nome, email, senha, cargo, status, telefone, cidade } = req.body || {};
+      const {
+        nome,
+        email,
+        cpf,
+        confirmEmail,
+        confirmarEmail,
+        senha,
+        confirmSenha,
+        confirmarSenha,
+        cargo,
+        status,
+        telefone,
+        logradouro,
+        numero,
+        complemento,
+        bairro,
+        cidade,
+        uf,
+        cep,
+        endereco,
+        enderecoId,
+      } = req.body || {};
+
       const usuarioId = req.usuario?.id || req.user?.id || null;
 
       if (!id) {
         return res.status(400).json({ error: 'ID do usuário não fornecido.' });
       }
 
-      const pool = await getPool();
-
-      // Checar se usuario existe
-      const checarExistente = await pool
-        .request()
-        .input('id', sql.VarChar, id)
-        .query('SELECT id FROM usuarios WHERE id = @id');
-
-      if (checarExistente.recordset.length === 0) {
+      const usuarioExistente = await UserModel.findById(id);
+      if (!usuarioExistente) {
         return res.status(404).json({
-          error: 'Colaborador não localizado no sistema. O usuário pode ter sido excluído recentemente.',
+          error: 'Colaborador não localizado no sistema. O usuário pode ter sido inativado recentemente.',
         });
       }
 
-      // Validar duplicidade de email caso alterado
-      if (email && String(email).trim()) {
-        const emailTratado = String(email).trim().toLowerCase();
-        const checarEmail = await pool
-          .request()
-          .input('email', sql.NVarChar, emailTratado)
-          .input('id', sql.VarChar, id)
-          .query('SELECT id FROM usuarios WHERE email = @email AND id != @id');
+      const dadosAtualizacao = {};
 
-        if (checarEmail.recordset.length > 0) {
+      if (nome !== undefined) {
+        dadosAtualizacao.nome = String(nome).trim();
+      }
+
+      // Validacao e correspondencia de email
+      if (email !== undefined && String(email).trim() !== '') {
+        const emailTratado = String(email).trim().toLowerCase();
+        const confirmacaoEmail = String(confirmEmail || confirmarEmail || '').trim().toLowerCase();
+
+        if (confirmacaoEmail && emailTratado !== confirmacaoEmail) {
           return res.status(400).json({
-            error: 'Este endereço de e-mail já está sendo utilizado por outro colaborador no sistema.',
+            error: 'A confirmação de e-mail não confere com o novo e-mail informado.',
           });
+        }
+
+        const emailEmUso = await UserModel.checkEmailExists(emailTratado, id);
+        if (emailEmUso) {
+          return res.status(400).json({
+            error: 'Este endereço de e-mail já está sendo utilizado por outro colaborador.',
+          });
+        }
+
+        dadosAtualizacao.email = emailTratado;
+      }
+
+      // Validacao e unicidade de CPF
+      if (cpf !== undefined) {
+        const cpfTratado = cpf ? String(cpf).trim() : null;
+        if (cpfTratado) {
+          const cpfEmUso = await UserModel.checkCpfExists(cpfTratado, id);
+          if (cpfEmUso) {
+            return res.status(400).json({
+              error: 'Este CPF já está sendo utilizado por outro colaborador.',
+            });
+          }
+        }
+        dadosAtualizacao.cpf = cpfTratado;
+      }
+
+      // Validacao e correspondencia de nova senha (se enviada)
+      if (senha && String(senha).trim() !== '') {
+        if (String(senha).length < 6) {
+          return res.status(400).json({
+            error: 'A nova senha deve possuir pelo menos 6 caracteres.',
+          });
+        }
+
+        const confirmacaoSenha = String(confirmSenha || confirmarSenha || '');
+        if (confirmacaoSenha && String(senha) !== confirmacaoSenha) {
+          return res.status(400).json({
+            error: 'A confirmação de senha não coincide com a nova senha digitada.',
+          });
+        }
+
+        dadosAtualizacao.senhaHash = await bcrypt.hash(String(senha), 10);
+      }
+
+      if (cargo !== undefined) {
+        dadosAtualizacao.cargo = String(cargo).toUpperCase();
+      }
+      if (status !== undefined) {
+        dadosAtualizacao.status = status;
+        dadosAtualizacao.ativo = status === 'ATIVO' ? 1 : 0;
+      }
+      if (telefone !== undefined) {
+        dadosAtualizacao.telefone = telefone ? String(telefone).trim() : null;
+      }
+      if (enderecoId !== undefined) {
+        dadosAtualizacao.enderecoId = enderecoId || null;
+      }
+
+      // Atualizar ou criar registro de endereço normalizado exclusivamente via AddressModel
+      const logradouroFinal = logradouro || endereco;
+      if (logradouroFinal || numero || bairro || cep || uf || cidade) {
+        const idEnd = usuarioExistente.endereco_id || usuarioExistente.enderecoId;
+        if (idEnd) {
+          await AddressModel.update(idEnd, {
+            logradouro: logradouroFinal ? String(logradouroFinal).trim() : undefined,
+            numero: numero !== undefined ? (numero ? String(numero).trim() : null) : undefined,
+            complemento: complemento !== undefined ? (complemento ? String(complemento).trim() : null) : undefined,
+            bairro: bairro !== undefined ? (bairro ? String(bairro).trim() : null) : undefined,
+            cidade: cidade !== undefined ? String(cidade).trim() : undefined,
+            uf: uf !== undefined ? String(uf).trim().toUpperCase() : undefined,
+            cep: cep !== undefined ? (cep ? String(cep).trim() : null) : undefined,
+          });
+        } else if (logradouroFinal && String(logradouroFinal).trim() !== '') {
+          const novoEnd = await AddressModel.create({
+            logradouro: String(logradouroFinal).trim(),
+            numero: numero ? String(numero).trim() : null,
+            complemento: complemento ? String(complemento).trim() : null,
+            bairro: bairro ? String(bairro).trim() : null,
+            cidade: cidade ? String(cidade).trim() : 'Viradouro',
+            uf: uf ? String(uf).trim().toUpperCase() : 'SP',
+            cep: cep ? String(cep).trim() : null,
+          });
+          dadosAtualizacao.enderecoId = novoEnd.id;
         }
       }
 
-      const requisicao = pool.request();
-      let consulta = 'UPDATE usuarios SET atualizado_em = GETDATE()';
+      const usuarioAtualizado = await UserModel.update(id, dadosAtualizacao);
 
-      if (nome !== undefined) {
-        consulta += ', nome = @nome';
-        requisicao.input('nome', sql.NVarChar, String(nome).trim());
-      }
-      if (email !== undefined) {
-        consulta += ', email = @email';
-        requisicao.input('email', sql.NVarChar, String(email).trim().toLowerCase());
-      }
-      if (senha && String(senha).trim()) {
-        const senhaHash = await bcrypt.hash(String(senha), 10);
-        consulta += ', senha_hash = @senha_hash';
-        requisicao.input('senha_hash', sql.NVarChar, senhaHash);
-      }
-      if (cargo !== undefined) {
-        consulta += ', cargo = @cargo';
-        requisicao.input('cargo', sql.NVarChar, String(cargo).toUpperCase());
-      }
-      if (status !== undefined) {
-        consulta += ', status = @status';
-        requisicao.input('status', sql.NVarChar, status);
-      }
-      if (telefone !== undefined) {
-        consulta += ', telefone = @telefone';
-        requisicao.input('telefone', sql.NVarChar, telefone ? String(telefone).trim() : null);
-      }
-      if (cidade !== undefined) {
-        consulta += ', cidade = @cidade';
-        requisicao.input('cidade', sql.NVarChar, String(cidade).trim());
-      }
-
-      consulta += `
-        OUTPUT 
-          inserted.id, inserted.nome, inserted.email, inserted.cargo, 
-          inserted.status, inserted.telefone, inserted.cidade, inserted.atualizado_em
-        WHERE id = @id
-      `;
-      requisicao.input('id', sql.VarChar, id);
-
-      const resultadoAtualizacao = await requisicao.query(consulta);
-      const usuario = resultadoAtualizacao.recordset[0];
-
-      // Auditoria: registro obrigatorio em logs_sistema
+      // Auditoria
       try {
+        const pool = await getPool();
         await pool
           .request()
           .input('usuario_id', sql.VarChar, usuarioId)
           .input('acao', sql.NVarChar, 'ATUALIZAR_USUARIO')
           .input('entidade', sql.NVarChar, 'usuarios')
-          .input('entidade_id', sql.NVarChar, usuario.id)
-          .input('detalhes', sql.NVarChar, JSON.stringify({ nome: usuario.nome, cargo: usuario.cargo, status: usuario.status }))
+          .input('entidade_id', sql.NVarChar, id)
+          .input(
+            'detalhes',
+            sql.NVarChar,
+            JSON.stringify({
+              nome: usuarioAtualizado.nome,
+              cargo: usuarioAtualizado.cargo,
+              status: usuarioAtualizado.status,
+            })
+          )
           .query(`
-            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes)
-            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes)
+            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
+            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
           `);
       } catch (erroLog) {
         console.warn('Falha ao registrar log de atualizacao de usuario:', erroLog.message);
       }
 
-      return res.status(200).json({
-        ...usuario,
-        name: usuario.nome,
-        role: usuario.cargo,
-        phone: usuario.telefone,
-        city: usuario.cidade,
-        updatedAt: usuario.atualizado_em,
-      });
+      return res.status(200).json(usuarioAtualizado);
     } catch (erro) {
       console.error('Erro ao atualizar usuário:', erro);
       return res.status(500).json({ error: erro.message || 'Erro ao atualizar colaborador.' });
     }
   },
 
-  // Exclusao de colaborador
+  // Soft Delete: Proibicao total de DELETE fisico
   async excluir(req, res) {
     try {
       const { id } = req.params;
-      const usuarioId = req.usuario?.id || req.user?.id || null;
+      const usuarioLogadoId = req.usuario?.id || req.user?.id || null;
 
       if (!id) {
         return res.status(400).json({ error: 'ID do usuário não fornecido.' });
       }
 
-      const pool = await getPool();
-
-      const resultadoUsuario = await pool
-        .request()
-        .input('id', sql.VarChar, id)
-        .query('SELECT id, nome, email FROM usuarios WHERE id = @id');
-
-      if (resultadoUsuario.recordset.length === 0) {
-        return res.status(404).json({
-          error: 'Colaborador não localizado para exclusão. O registro pode já ter sido removido.',
+      if (usuarioLogadoId === id) {
+        return res.status(400).json({
+          error: 'Você não pode desativar a sua própria conta logada no sistema.',
         });
       }
 
-      const usuario = resultadoUsuario.recordset[0];
+      const usuarioExistente = await UserModel.findById(id);
+      if (!usuarioExistente) {
+        return res.status(404).json({
+          error: 'Colaborador não localizado para desativação.',
+        });
+      }
 
-      await pool
-        .request()
-        .input('id', sql.VarChar, id)
-        .query('DELETE FROM usuarios WHERE id = @id');
+      // Executa Soft Delete pelo Model (UPDATE status = 'INATIVO', ativo = 0)
+      const usuarioDesativado = await UserModel.softDelete(id);
 
-      // Auditoria: registro obrigatorio em logs_sistema
+      // Auditoria: registro de inativacao
       try {
+        const pool = await getPool();
         await pool
           .request()
-          .input('usuario_id', sql.VarChar, usuarioId)
-          .input('acao', sql.NVarChar, 'EXCLUIR_USUARIO')
+          .input('usuario_id', sql.VarChar, usuarioLogadoId)
+          .input('acao', sql.NVarChar, 'INATIVAR_USUARIO')
           .input('entidade', sql.NVarChar, 'usuarios')
-          .input('entidade_id', sql.NVarChar, usuario.id)
-          .input('detalhes', sql.NVarChar, JSON.stringify({ nome: usuario.nome, email: usuario.email, status: 'EXCLUIDO' }))
+          .input('entidade_id', sql.NVarChar, id)
+          .input(
+            'detalhes',
+            sql.NVarChar,
+            JSON.stringify({
+              nome: usuarioExistente.nome,
+              email: usuarioExistente.email,
+              statusAnterior: usuarioExistente.status,
+              statusNovo: 'INATIVO',
+              ativo: 0,
+            })
+          )
           .query(`
-            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes)
-            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes)
+            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
+            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
           `);
       } catch (erroLog) {
-        console.warn('Falha ao registrar log de exclusao de usuario:', erroLog.message);
+        console.warn('Falha ao registrar log de inativacao de usuario:', erroLog.message);
       }
 
       return res.status(200).json({
-        mensagem: 'Colaborador excluído com sucesso.',
-        usuario,
+        mensagem: 'Colaborador desativado com sucesso.',
+        usuario: usuarioDesativado,
       });
     } catch (erro) {
-      console.error('Erro ao excluir usuário:', erro);
-      return res.status(500).json({ error: erro.message || 'Erro ao excluir colaborador.' });
+      console.error('Erro ao desativar usuário:', erro);
+      return res.status(500).json({ error: erro.message || 'Erro ao desativar colaborador.' });
     }
   },
 };

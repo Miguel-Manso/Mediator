@@ -1,8 +1,9 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard,
   Users,
+  Laptop,
+  Package,
   UserCheck,
   Wrench,
   LogOut,
@@ -10,9 +11,10 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 
 const itensMenu = [
-  { nome: 'Dashboard', caminho: '/dashboard', icone: LayoutDashboard },
   { nome: 'Clientes', caminho: '/clientes', icone: Users },
-  { nome: 'Usuários', caminho: '/usuarios', icone: UserCheck },
+  { nome: 'Equipamentos', caminho: '/equipamentos', icone: Laptop },
+  { nome: 'Produtos', caminho: '/produtos', icone: Package },
+  { nome: 'Usuários', caminho: '/usuarios', icone: UserCheck, requerAdmin: true },
 ];
 
 export const Sidebar = () => {
@@ -21,7 +23,19 @@ export const Sidebar = () => {
   const acaoSair = sair || signOut;
 
   const nomeExibicao = usuarioAtual?.nome || usuarioAtual?.name || 'Usuário';
-  const cargoExibicao = usuarioAtual?.cargo || (usuarioAtual?.role === 'ATTENDANT' ? 'ATENDENTE' : usuarioAtual?.role === 'TECHNICIAN' ? 'TECNICO' : usuarioAtual?.role) || 'ATENDENTE';
+  const cargoExibicao =
+    usuarioAtual?.cargo ||
+    (usuarioAtual?.role === 'ATTENDANT'
+      ? 'ATENDENTE'
+      : usuarioAtual?.role === 'TECHNICIAN'
+      ? 'TECNICO'
+      : usuarioAtual?.role) ||
+    'ATENDENTE';
+
+  const ehAdmin = String(cargoExibicao).toUpperCase() === 'ADMIN';
+
+  // Ocultar rota/menu de usuários caso não seja ADMIN
+  const itensVisiveis = itensMenu.filter((item) => !item.requerAdmin || ehAdmin);
 
   return (
     <aside className="flex min-h-screen w-60 flex-shrink-0 flex-col justify-between border-r border-slate-200 bg-white p-4">
@@ -36,7 +50,7 @@ export const Sidebar = () => {
         </div>
 
         <nav className="space-y-1">
-          {itensMenu.map((item) => {
+          {itensVisiveis.map((item) => {
             const Icone = item.icone;
             return (
               <NavLink

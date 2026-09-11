@@ -2,7 +2,7 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
 
-export const DashboardLayout = () => {
+export const AppLayout = () => {
   return (
     <div className="flex min-h-screen bg-[#f4f5f7] text-slate-800">
       <Sidebar />

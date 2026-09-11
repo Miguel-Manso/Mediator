@@ -1,63 +1,45 @@
 const { getPool, sql } = require('../config/db');
+const ClientModel = require('../models/Client.model');
+const AddressModel = require('../models/Address.model');
 
 const clientController = {
-  // Listagem com filtro opcional
+  // Listagem com filtro opcional via Model
   async listar(req, res) {
     try {
-      const busca = req.query.busca || req.query.search;
-      const pool = await getPool();
-      const requisicao = pool.request();
-
-      let consulta = `
-        SELECT 
-          id, 
-          nome, 
-          cpf, 
-          email, 
-          telefone, 
-          cidade, 
-          endereco, 
-          status, 
-          observacoes, 
-          criado_em AS criadoEm, 
-          atualizado_em AS atualizadoEm,
-          nome AS name,
-          telefone AS phone,
-          cidade AS city,
-          endereco AS address,
-          observacoes AS notes,
-          criado_em AS createdAt,
-          atualizado_em AS updatedAt
-        FROM clientes
-      `;
-
-      if (busca && String(busca).trim() !== '') {
-        requisicao.input('termoBusca', sql.NVarChar, `%${String(busca).trim()}%`);
-        consulta += `
-          WHERE nome LIKE @termoBusca 
-             OR cpf LIKE @termoBusca 
-             OR cidade LIKE @termoBusca 
-             OR telefone LIKE @termoBusca
-        `;
-      }
-
-      consulta += ' ORDER BY nome ASC';
-
-      const resultado = await requisicao.query(consulta);
-      return res.status(200).json(resultado.recordset);
+      const busca = req.query.busca || req.query.search || '';
+      const clientes = await ClientModel.findAll({ search: busca });
+      return res.status(200).json(clientes);
     } catch (erro) {
       console.error('Erro ao listar clientes:', erro);
       return res.status(500).json({ error: erro.message || 'Erro ao listar clientes.' });
     }
   },
 
-  // Cadastro de cliente
+  // Cadastro de cliente com validacao de campos e criacao de endereco
   async criar(req, res) {
     try {
-      const { nome, cpf, email, telefone, cidade, endereco, observacoes } = req.body || {};
+      const {
+        nome,
+        cpf,
+        email,
+        confirmEmail,
+        confirmarEmail,
+        telefone,
+        cidade,
+        endereco,
+        observacoes,
+        // Campos estruturados de endereco
+        logradouro,
+        numero,
+        complemento,
+        bairro,
+        uf,
+        cep,
+      } = req.body || {};
+
       const usuarioId = req.usuario?.id || req.user?.id || null;
 
-      // Validacoes manuais diretas
+      // 1. Validacao de campos obrigatorios
       if (!nome || !String(nome).trim()) {
         return res.status(400).json({ error: 'O nome do cliente é obrigatório.' });
       }
@@ -66,76 +48,79 @@ const clientController = {
         return res.status(400).json({ error: 'O telefone do cliente é obrigatório.' });
       }
 
-      const pool = await getPool();
+      // 2. Validacao de correspondencia de e-mail (se fornecido)
+      const emailTratado = email && String(email).trim() !== '' ? String(email).trim().toLowerCase() : null;
+      const confirmacaoEmail = String(confirmEmail || confirmarEmail || '').trim().toLowerCase();
 
-      // Checar duplicidade de CPF caso informado
+      if (emailTratado && confirmacaoEmail && emailTratado !== confirmacaoEmail) {
+        return res.status(400).json({
+          error: 'A confirmação de e-mail não corresponde ao e-mail informado.',
+        });
+      }
+
+      // 3. Checar duplicidade de CPF se fornecido
       if (cpf && String(cpf).trim() !== '') {
-        const checarCpf = await pool
-          .request()
-          .input('cpf', sql.NVarChar, String(cpf).trim())
-          .query('SELECT id FROM clientes WHERE cpf = @cpf');
-
-        if (checarCpf.recordset.length > 0) {
+        const cpfExiste = await ClientModel.checkCpfExists(cpf);
+        if (cpfExiste) {
           return res.status(400).json({
-            error: 'Este CPF já está cadastrado para outro cliente no sistema. Verifique o número informado.',
+            error: 'Este CPF já está cadastrado para outro cliente no sistema.',
           });
         }
       }
 
-      const resultadoInsercao = await pool
-        .request()
-        .input('nome', sql.NVarChar, String(nome).trim())
-        .input('cpf', sql.NVarChar, cpf ? String(cpf).trim() : null)
-        .input('email', sql.NVarChar, email ? String(email).trim() : null)
-        .input('telefone', sql.NVarChar, String(telefone).trim())
-        .input('cidade', sql.NVarChar, cidade ? String(cidade).trim() : 'Viradouro')
-        .input('endereco', sql.NVarChar, endereco ? String(endereco).trim() : null)
-        .input('observacoes', sql.NVarChar, observacoes ? String(observacoes).trim() : null)
-        .query(`
-          INSERT INTO clientes (id, nome, cpf, email, telefone, cidade, endereco, status, observacoes)
-          OUTPUT inserted.id, inserted.nome, inserted.cpf, inserted.email, inserted.telefone, inserted.cidade, inserted.endereco, inserted.status, inserted.observacoes, inserted.criado_em, inserted.atualizado_em
-          VALUES (LOWER(NEWID()), @nome, @cpf, @email, @telefone, @cidade, @endereco, 'ATIVO', @observacoes)
-        `);
+      // 4. Criar registro de endereco caso haja dados de localizacao
+      let enderecoId = null;
+      const logradouroFinal = logradouro || endereco;
+      if (logradouroFinal && String(logradouroFinal).trim() !== '') {
+        try {
+          const enderecoCriado = await AddressModel.create({
+            logradouro: String(logradouroFinal).trim(),
+            numero: numero ? String(numero).trim() : null,
+            complemento: complemento ? String(complemento).trim() : null,
+            bairro: bairro ? String(bairro).trim() : null,
+            cidade: cidade ? String(cidade).trim() : 'Viradouro',
+            uf: uf ? String(uf).trim().toUpperCase() : 'SP',
+            cep: cep ? String(cep).trim() : null,
+          });
+          enderecoId = enderecoCriado.id;
+        } catch (erroEndereco) {
+          console.warn('Não foi possível persistir o registro em enderecos:', erroEndereco.message);
+        }
+      }
 
-      const cliente = resultadoInsercao.recordset[0];
+      // 5. Criar cliente na camada Model
+      const cliente = await ClientModel.create({
+        nome: String(nome).trim(),
+        cpf: cpf ? String(cpf).trim() : null,
+        email: emailTratado,
+        telefone: String(telefone).trim(),
+        enderecoId,
+        observacoes: observacoes ? String(observacoes).trim() : null,
+      });
 
-      // Auditoria: registro obrigatorio em logs_sistema
+      // 7. Registro de auditoria em logs_sistema
       try {
+        const pool = await getPool();
         await pool
           .request()
           .input('usuario_id', sql.VarChar, usuarioId)
           .input('acao', sql.NVarChar, 'CRIAR_CLIENTE')
           .input('entidade', sql.NVarChar, 'clientes')
           .input('entidade_id', sql.NVarChar, cliente.id)
-          .input('detalhes', sql.NVarChar, JSON.stringify({ nome: cliente.nome, telefone: cliente.telefone, cidade: cliente.cidade }))
+          .input(
+            'detalhes',
+            sql.NVarChar,
+            JSON.stringify({ nome: cliente.nome, telefone: cliente.telefone, cidade: cliente.cidade })
+          )
           .query(`
-            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes)
-            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes)
+            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
+            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
           `);
       } catch (erroLog) {
         console.warn('Falha ao registrar log de criacao de cliente:', erroLog.message);
       }
 
-      return res.status(201).json({
-        id: cliente.id,
-        nome: cliente.nome,
-        cpf: cliente.cpf,
-        email: cliente.email,
-        telefone: cliente.telefone,
-        cidade: cliente.cidade,
-        endereco: cliente.endereco,
-        status: cliente.status,
-        observacoes: cliente.observacoes,
-        criadoEm: cliente.criado_em,
-        atualizadoEm: cliente.atualizado_em,
-        name: cliente.nome,
-        phone: cliente.telefone,
-        city: cliente.cidade,
-        address: cliente.endereco,
-        notes: cliente.observacoes,
-        createdAt: cliente.criado_em,
-        updatedAt: cliente.atualizado_em,
-      });
+      return res.status(201).json(cliente);
     } catch (erro) {
       console.error('Erro ao criar cliente:', erro);
       return res.status(500).json({ error: erro.message || 'Erro ao cadastrar cliente.' });
@@ -146,121 +131,143 @@ const clientController = {
   async atualizar(req, res) {
     try {
       const { id } = req.params;
-      const { nome, cpf, email, telefone, cidade, endereco, observacoes, status } = req.body || {};
+      const {
+        nome,
+        cpf,
+        email,
+        confirmEmail,
+        confirmarEmail,
+        telefone,
+        cidade,
+        endereco,
+        observacoes,
+        status,
+        // Campos estruturados de endereco
+        logradouro,
+        numero,
+        complemento,
+        bairro,
+        uf,
+        cep,
+      } = req.body || {};
+
       const usuarioId = req.usuario?.id || req.user?.id || null;
 
       if (!id) {
         return res.status(400).json({ error: 'ID do cliente não fornecido.' });
       }
 
-      const pool = await getPool();
-
-      // Checar existencia do cliente
-      const checarExistente = await pool
-        .request()
-        .input('id', sql.VarChar, id)
-        .query('SELECT id FROM clientes WHERE id = @id');
-
-      if (checarExistente.recordset.length === 0) {
+      const clienteExistente = await ClientModel.findById(id);
+      if (!clienteExistente) {
         return res.status(404).json({
-          error: 'Cliente não localizado no sistema. O registro pode ter sido excluído recentemente.',
+          error: 'Cliente não localizado no sistema para atualização.',
         });
       }
 
-      // Validar duplicidade de CPF com outro cliente
-      if (cpf && String(cpf).trim() !== '') {
-        const checarCpf = await pool
-          .request()
-          .input('cpf', sql.NVarChar, String(cpf).trim())
-          .input('id', sql.VarChar, id)
-          .query('SELECT id FROM clientes WHERE cpf = @cpf AND id != @id');
+      const dadosAtualizacao = {};
 
-        if (checarCpf.recordset.length > 0) {
-          return res.status(400).json({
-            error: 'Este CPF já pertence a outro cliente cadastrado no sistema. Informe um CPF diferente.',
-          });
+      if (nome !== undefined) {
+        dadosAtualizacao.nome = String(nome).trim();
+      }
+
+      if (cpf !== undefined) {
+        if (cpf && String(cpf).trim() !== '') {
+          const cpfDuplicado = await ClientModel.checkCpfExists(cpf, id);
+          if (cpfDuplicado) {
+            return res.status(400).json({
+              error: 'Este CPF já pertence a outro cliente cadastrado no sistema.',
+            });
+          }
+          dadosAtualizacao.cpf = String(cpf).trim();
+        } else {
+          dadosAtualizacao.cpf = null;
         }
       }
 
-      const requisicao = pool.request();
-      let consulta = 'UPDATE clientes SET atualizado_em = GETDATE()';
-
-      if (nome !== undefined) {
-        consulta += ', nome = @nome';
-        requisicao.input('nome', sql.NVarChar, String(nome).trim());
-      }
-      if (cpf !== undefined) {
-        consulta += ', cpf = @cpf';
-        requisicao.input('cpf', sql.NVarChar, cpf ? String(cpf).trim() : null);
-      }
+      // Validacao e correspondencia de e-mail
       if (email !== undefined) {
-        consulta += ', email = @email';
-        requisicao.input('email', sql.NVarChar, email ? String(email).trim() : null);
+        const emailTratado = email && String(email).trim() !== '' ? String(email).trim().toLowerCase() : null;
+        const confirmacaoEmail = String(confirmEmail || confirmarEmail || '').trim().toLowerCase();
+
+        if (emailTratado && confirmacaoEmail && emailTratado !== confirmacaoEmail) {
+          return res.status(400).json({
+            error: 'A confirmação de e-mail não corresponde ao novo e-mail informado.',
+          });
+        }
+        dadosAtualizacao.email = emailTratado;
       }
+
       if (telefone !== undefined) {
-        consulta += ', telefone = @telefone';
-        requisicao.input('telefone', sql.NVarChar, String(telefone).trim());
-      }
-      if (cidade !== undefined) {
-        consulta += ', cidade = @cidade';
-        requisicao.input('cidade', sql.NVarChar, String(cidade).trim());
-      }
-      if (endereco !== undefined) {
-        consulta += ', endereco = @endereco';
-        requisicao.input('endereco', sql.NVarChar, endereco ? String(endereco).trim() : null);
+        dadosAtualizacao.telefone = String(telefone).trim();
       }
       if (observacoes !== undefined) {
-        consulta += ', observacoes = @observacoes';
-        requisicao.input('observacoes', sql.NVarChar, observacoes ? String(observacoes).trim() : null);
+        dadosAtualizacao.observacoes = observacoes ? String(observacoes).trim() : null;
       }
       if (status !== undefined) {
-        consulta += ', status = @status';
-        requisicao.input('status', sql.NVarChar, status);
+        dadosAtualizacao.status = status;
+        dadosAtualizacao.ativo = status === 'ATIVO' ? 1 : 0;
       }
 
-      consulta += `
-        OUTPUT 
-          inserted.id, inserted.nome, inserted.cpf, inserted.email, 
-          inserted.telefone, inserted.cidade, inserted.endereco, 
-          inserted.status, inserted.observacoes, inserted.atualizado_em
-        WHERE id = @id
-      `;
-      requisicao.input('id', sql.VarChar, id);
+      // Atualizar ou criar registro de endereco estruturado exclusivamente via AddressModel
+      const logradouroFinal = logradouro || endereco;
+      if (logradouroFinal || numero || bairro || cep || uf || cidade) {
+        if (clienteExistente.endereco_id || clienteExistente.enderecoId) {
+          const idEnd = clienteExistente.endereco_id || clienteExistente.enderecoId;
+          await AddressModel.update(idEnd, {
+            logradouro: logradouroFinal ? String(logradouroFinal).trim() : undefined,
+            numero: numero !== undefined ? (numero ? String(numero).trim() : null) : undefined,
+            complemento: complemento !== undefined ? (complemento ? String(complemento).trim() : null) : undefined,
+            bairro: bairro !== undefined ? (bairro ? String(bairro).trim() : null) : undefined,
+            cidade: cidade !== undefined ? String(cidade).trim() : undefined,
+            uf: uf !== undefined ? String(uf).trim().toUpperCase() : undefined,
+            cep: cep !== undefined ? (cep ? String(cep).trim() : null) : undefined,
+          });
+        } else if (logradouroFinal && String(logradouroFinal).trim() !== '') {
+          const novoEnd = await AddressModel.create({
+            logradouro: String(logradouroFinal).trim(),
+            numero: numero ? String(numero).trim() : null,
+            complemento: complemento ? String(complemento).trim() : null,
+            bairro: bairro ? String(bairro).trim() : null,
+            cidade: cidade ? String(cidade).trim() : 'Viradouro',
+            uf: uf ? String(uf).trim().toUpperCase() : 'SP',
+            cep: cep ? String(cep).trim() : null,
+          });
+          dadosAtualizacao.enderecoId = novoEnd.id;
+        }
+      }
 
-      const resultadoAtualizacao = await requisicao.query(consulta);
-      const cliente = resultadoAtualizacao.recordset[0];
+      const clienteAtualizado = await ClientModel.update(id, dadosAtualizacao);
 
-      // Auditoria: registro obrigatorio em logs_sistema
+      // Auditoria
       try {
+        const pool = await getPool();
         await pool
           .request()
           .input('usuario_id', sql.VarChar, usuarioId)
           .input('acao', sql.NVarChar, 'ATUALIZAR_CLIENTE')
           .input('entidade', sql.NVarChar, 'clientes')
-          .input('entidade_id', sql.NVarChar, cliente.id)
-          .input('detalhes', sql.NVarChar, JSON.stringify({ nome: cliente.nome, status: cliente.status }))
+          .input('entidade_id', sql.NVarChar, id)
+          .input(
+            'detalhes',
+            sql.NVarChar,
+            JSON.stringify({ nome: clienteAtualizado.nome, status: clienteAtualizado.status })
+          )
           .query(`
-            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes)
-            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes)
+            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
+            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
           `);
       } catch (erroLog) {
         console.warn('Falha ao registrar log de atualizacao de cliente:', erroLog.message);
       }
 
-      return res.status(200).json({
-        ...cliente,
-        name: cliente.nome,
-        phone: cliente.telefone,
-        city: cliente.cidade,
-        updatedAt: cliente.atualizado_em,
-      });
+      return res.status(200).json(clienteAtualizado);
     } catch (erro) {
       console.error('Erro ao atualizar cliente:', erro);
       return res.status(500).json({ error: erro.message || 'Erro ao atualizar cliente.' });
     }
   },
 
-  // Exclusao de cliente
+  // Soft Delete de cliente
   async excluir(req, res) {
     try {
       const { id } = req.params;
@@ -270,46 +277,40 @@ const clientController = {
         return res.status(400).json({ error: 'ID do cliente não fornecido.' });
       }
 
-      const pool = await getPool();
-
-      const resultadoCliente = await pool
-        .request()
-        .input('id', sql.VarChar, id)
-        .query('SELECT id, nome FROM clientes WHERE id = @id');
-
-      if (resultadoCliente.recordset.length === 0) {
+      const clienteExistente = await ClientModel.findById(id);
+      if (!clienteExistente) {
         return res.status(404).json({
-          error: 'Cliente não localizado no sistema para exclusão. O registro pode já ter sido removido.',
+          error: 'Cliente não localizado no sistema para inativação.',
         });
       }
 
-      const cliente = resultadoCliente.recordset[0];
+      const clienteInativado = await ClientModel.softDelete(id);
 
-      await pool
-        .request()
-        .input('id', sql.VarChar, id)
-        .query('DELETE FROM clientes WHERE id = @id');
-
-      // Auditoria: registro obrigatorio em logs_sistema
+      // Auditoria
       try {
+        const pool = await getPool();
         await pool
           .request()
           .input('usuario_id', sql.VarChar, usuarioId)
-          .input('acao', sql.NVarChar, 'EXCLUIR_CLIENTE')
+          .input('acao', sql.NVarChar, 'INATIVAR_CLIENTE')
           .input('entidade', sql.NVarChar, 'clientes')
-          .input('entidade_id', sql.NVarChar, cliente.id)
-          .input('detalhes', sql.NVarChar, JSON.stringify({ nome: cliente.nome, status: 'EXCLUIDO' }))
+          .input('entidade_id', sql.NVarChar, id)
+          .input(
+            'detalhes',
+            sql.NVarChar,
+            JSON.stringify({ nome: clienteExistente.nome, status: 'INATIVO', ativo: 0 })
+          )
           .query(`
-            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes)
-            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes)
+            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
+            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
           `);
       } catch (erroLog) {
-        console.warn('Falha ao registrar log de exclusao de cliente:', erroLog.message);
+        console.warn('Falha ao registrar log de inativacao de cliente:', erroLog.message);
       }
 
       return res.status(200).json({
-        mensagem: 'Cliente excluído com sucesso.',
-        cliente,
+        mensagem: 'Cliente desativado com sucesso.',
+        cliente: clienteInativado,
       });
     } catch (erro) {
       console.error('Erro ao excluir cliente:', erro);

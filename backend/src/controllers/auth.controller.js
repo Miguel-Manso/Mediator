@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { getPool, sql } = require('../config/db');
+const UserModel = require('../models/User.model');
 
 const authController = {
   async login(req, res) {
@@ -12,16 +13,8 @@ const authController = {
         return res.status(400).json({ error: 'Informe o e-mail e a senha para acessar.' });
       }
 
-      const pool = await getPool();
       const emailLimpo = String(email).trim().toLowerCase();
-
-      // Busca usuario por email
-      const resultado = await pool
-        .request()
-        .input('email', sql.NVarChar, emailLimpo)
-        .query('SELECT id, nome, email, senha_hash, cargo, status FROM usuarios WHERE LOWER(email) = @email');
-
-      const usuario = resultado.recordset[0];
+      const usuario = await UserModel.findByEmail(emailLimpo);
 
       if (!usuario) {
         return res.status(401).json({
@@ -29,7 +22,7 @@ const authController = {
         });
       }
 
-      const statusAtivo = usuario.status === 'ATIVO' || usuario.status === 'ACTIVE';
+      const statusAtivo = (usuario.status === 'ATIVO' || usuario.status === 'ACTIVE') && usuario.ativo !== false && usuario.ativo !== 0;
       if (!statusAtivo) {
         return res.status(401).json({
           error: 'Esta conta de usuário está desativada. Solicite a reativação do acesso ao administrador do sistema.',
@@ -43,8 +36,7 @@ const authController = {
         });
       }
 
-      // Geracao do token JWT usando segredo das variaveis de ambiente
-      const secret = process.env.JWT_SECRET || 'teste';
+      const secret = process.env.JWT_SECRET || 'rocha_magazine_jwt_secret_dev_key_2026_super_safe';
       const expiresIn = process.env.JWT_EXPIRES_IN || '8h';
 
       const token = jwt.sign(
@@ -59,6 +51,7 @@ const authController = {
       );
 
       try {
+        const pool = await getPool();
         await pool
           .request()
           .input('usuario_id', sql.VarChar, usuario.id)
@@ -67,8 +60,8 @@ const authController = {
           .input('entidade_id', sql.NVarChar, usuario.id)
           .input('detalhes', sql.NVarChar, JSON.stringify({ email: usuario.email, cargo: usuario.cargo }))
           .query(`
-            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes)
-            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes)
+            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
+            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
           `);
       } catch (erroLog) {
         console.warn('Falha ao registrar log de login:', erroLog.message);

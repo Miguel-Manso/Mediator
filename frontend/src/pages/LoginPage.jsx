@@ -19,7 +19,7 @@ export const LoginPage = () => {
 
     try {
       await entrar({ email: email.trim(), senha });
-      navegar('/dashboard');
+      navegar('/clientes');
     } catch (err) {
       setErro(err.response?.data?.error || 'Erro ao conectar. Verifique suas credenciais.');
     } finally {

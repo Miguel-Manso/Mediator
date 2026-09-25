@@ -1,0 +1,398 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-09-10T22:35:00.000Z",
+  "__export_source": "insomnia.desktop.app:v2023.5.8",
+  "resources": [
+    {
+      "_id": "wrk_mediator_api",
+      "_type": "workspace",
+      "name": "Rocha Magazine - Mediator API",
+      "description": "Coleção de requisições REST/CRUD para o Sistema Mediator (RF01 - RF04) com SQL Server e JWT",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_mediator_base",
+      "_type": "environment",
+      "parentId": "wrk_mediator_api",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:3333/api",
+        "token": "SEU_TOKEN_JWT_AQUI"
+      }
+    },
+    {
+      "_id": "fld_auth",
+      "_type": "request_group",
+      "parentId": "wrk_mediator_api",
+      "name": "1. Autenticação"
+    },
+    {
+      "_id": "req_login",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Login (Obter Token JWT)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/auth/login",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"admin@mediator.com\",\n  \"password\": \"123456\"\n}"
+      }
+    },
+    {
+      "_id": "req_health",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Health Check",
+      "method": "GET",
+      "url": "{{ _.base_url }}/health",
+      "headers": []
+    },
+    {
+      "_id": "fld_users",
+      "_type": "request_group",
+      "parentId": "wrk_mediator_api",
+      "name": "2. Usuários (RF01)"
+    },
+    {
+      "_id": "req_create_user",
+      "_type": "request",
+      "parentId": "fld_users",
+      "name": "Criar Usuário com CPF (ADMIN)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/usuarios",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"Mariana Souza\",\n  \"email\": \"mariana@mediator.com\",\n  \"confirmEmail\": \"mariana@mediator.com\",\n  \"cpf\": \"123.456.789-01\",\n  \"senha\": \"123456\",\n  \"confirmSenha\": \"123456\",\n  \"cargo\": \"ATENDENTE\",\n  \"telefone\": \"(17) 98888-7777\",\n  \"cidade\": \"Viradouro\"\n}"
+      }
+    },
+    {
+      "_id": "req_list_users",
+      "_type": "request",
+      "parentId": "fld_users",
+      "name": "Listar Usuários",
+      "method": "GET",
+      "url": "{{ _.base_url }}/usuarios",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "req_update_user",
+      "_type": "request",
+      "parentId": "fld_users",
+      "name": "Atualizar Usuário",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/usuarios/ID_DO_USUARIO_AQUI",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"Mariana Souza Editada\",\n  \"cargo\": \"TECNICO\",\n  \"telefone\": \"(17) 98888-9999\"\n}"
+      }
+    },
+    {
+      "_id": "req_deactivate_user",
+      "_type": "request",
+      "parentId": "fld_users",
+      "name": "Inativar Usuário (Soft Delete)",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/usuarios/ID_DO_USUARIO_AQUI",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "fld_clients",
+      "_type": "request_group",
+      "parentId": "wrk_mediator_api",
+      "name": "3. Clientes (RF02)"
+    },
+    {
+      "_id": "req_create_client",
+      "_type": "request",
+      "parentId": "fld_clients",
+      "name": "Cadastrar Novo Cliente",
+      "method": "POST",
+      "url": "{{ _.base_url }}/clientes",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"Carlos Oliveira\",\n  \"cpf\": \"456.789.123-00\",\n  \"email\": \"carlos@email.com\",\n  \"telefone\": \"(17) 99876-5432\",\n  \"cidade\": \"Viradouro\",\n  \"uf\": \"SP\",\n  \"logradouro\": \"Rua das Palmeiras\",\n  \"numero\": \"120\",\n  \"bairro\": \"Centro\",\n  \"observacoes\": \"Cliente preferencial\"\n}"
+      }
+    },
+    {
+      "_id": "req_list_clients",
+      "_type": "request",
+      "parentId": "fld_clients",
+      "name": "Listar Todos os Clientes",
+      "method": "GET",
+      "url": "{{ _.base_url }}/clientes",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "req_search_clients",
+      "_type": "request",
+      "parentId": "fld_clients",
+      "name": "Buscar Clientes por Termo/Filtro",
+      "method": "GET",
+      "url": "{{ _.base_url }}/clientes?busca=Carlos",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "req_deactivate_client",
+      "_type": "request",
+      "parentId": "fld_clients",
+      "name": "Inativar Cliente (Soft Delete)",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/clientes/ID_DO_CLIENTE_AQUI",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "fld_equipment",
+      "_type": "request_group",
+      "parentId": "wrk_mediator_api",
+      "name": "4. Equipamentos (RF03)"
+    },
+    {
+      "_id": "req_list_equipment",
+      "_type": "request",
+      "parentId": "fld_equipment",
+      "name": "Listar Equipamentos",
+      "method": "GET",
+      "url": "{{ _.base_url }}/equipamentos",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "req_aux_equipment",
+      "_type": "request",
+      "parentId": "fld_equipment",
+      "name": "Obter Dados Auxiliares (Categorias, Marcas, Modelos)",
+      "method": "GET",
+      "url": "{{ _.base_url }}/equipamentos/dados-auxiliares",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "req_create_equipment",
+      "_type": "request",
+      "parentId": "fld_equipment",
+      "name": "Cadastrar Equipamento",
+      "method": "POST",
+      "url": "{{ _.base_url }}/equipamentos",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"clienteId\": \"ID_DO_CLIENTE\",\n  \"categoriaId\": \"ID_DA_CATEGORIA\",\n  \"marcaId\": \"ID_DA_MARCA\",\n  \"modeloId\": \"ID_DO_MODELO\",\n  \"numeroSerie\": \"SN-DELL-987654\",\n  \"condicoesEntrada\": \"Tela trincada, acompanha carregador original\",\n  \"observacoes\": \"Prioridade normal\"\n}"
+      }
+    },
+    {
+      "_id": "req_update_equipment",
+      "_type": "request",
+      "parentId": "fld_equipment",
+      "name": "Atualizar Equipamento",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/equipamentos/ID_DO_EQUIPAMENTO",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"condicoesEntrada\": \"Tela trincada e sem carregador\",\n  \"observacoes\": \"Cliente ligou solicitando urgência\"\n}"
+      }
+    },
+    {
+      "_id": "req_deactivate_equipment",
+      "_type": "request",
+      "parentId": "fld_equipment",
+      "name": "Inativar Equipamento (Soft Delete)",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/equipamentos/ID_DO_EQUIPAMENTO",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "fld_products",
+      "_type": "request_group",
+      "parentId": "wrk_mediator_api",
+      "name": "5. Produtos e Peças (RF04)"
+    },
+    {
+      "_id": "req_list_products",
+      "_type": "request",
+      "parentId": "fld_products",
+      "name": "Listar Produtos / Peças",
+      "method": "GET",
+      "url": "{{ _.base_url }}/produtos",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "req_create_product",
+      "_type": "request",
+      "parentId": "fld_products",
+      "name": "Cadastrar Produto / Peça",
+      "method": "POST",
+      "url": "{{ _.base_url }}/produtos",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"SSD Kingston NV2 1TB M.2 NVMe\",\n  \"codigoReferencia\": \"SSD-NV2-1TB\",\n  \"precoCusto\": 220.00,\n  \"precoVenda\": 369.90,\n  \"quantidadeEstoque\": 12,\n  \"estoqueMinimo\": 3\n}"
+      }
+    },
+    {
+      "_id": "req_update_product",
+      "_type": "request",
+      "parentId": "fld_products",
+      "name": "Atualizar Produto / Peça",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/produtos/ID_DO_PRODUTO",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"SSD Kingston NV2 1TB M.2 NVMe Atualizado\",\n  \"precoVenda\": 349.90,\n  \"quantidadeEstoque\": 15,\n  \"estoqueMinimo\": 4\n}"
+      }
+    },
+    {
+      "_id": "req_toggle_status_product",
+      "_type": "request",
+      "parentId": "fld_products",
+      "name": "Alternar Status (Ativar/Inativar Produto)",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/produtos/ID_DO_PRODUTO/status",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"ativo\": false\n}"
+      }
+    },
+    {
+      "_id": "req_deactivate_product",
+      "_type": "request",
+      "parentId": "fld_products",
+      "name": "Inativar Produto (Soft Delete DELETE)",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/produtos/ID_DO_PRODUTO",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    }
+  ]
+}

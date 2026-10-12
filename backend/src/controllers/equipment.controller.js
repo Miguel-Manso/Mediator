@@ -12,7 +12,8 @@ const equipmentController = {
       const clienteId = req.query.clienteId || req.query.cliente_id || null;
       const categoriaId = req.query.categoriaId || req.query.categoria_id || null;
       const marcaId = req.query.marcaId || req.query.marca_id || null;
-      const apenasAtivos = req.query.apenasAtivos === 'true' || req.query.ativos === 'true';
+      const incluirInativos = req.query.incluirInativos === 'true' || req.query.inativos === 'true';
+      const apenasAtivos = !incluirInativos && req.query.apenasAtivos !== 'false';
 
       const equipamentos = await EquipmentModel.listar({
         busca,

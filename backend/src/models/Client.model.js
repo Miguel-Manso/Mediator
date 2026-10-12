@@ -1,7 +1,7 @@
 const { getPool, sql } = require('../config/db');
 
 class ClientModel {
-  static async findAll({ search = '' } = {}) {
+  static async findAll({ search = '', apenasAtivos = true } = {}) {
     const pool = await getPool();
     const req = pool.request();
 
@@ -36,18 +36,25 @@ class ClientModel {
         e.uf
       FROM clientes c
       LEFT JOIN enderecos e ON c.endereco_id = e.id
+      WHERE 1=1
     `;
+
+    if (apenasAtivos) {
+      query += ' AND c.ativo = 1';
+    }
 
     if (search && String(search).trim() !== '') {
       req.input('termoBusca', sql.NVarChar, `%${String(search).trim()}%`);
       query += `
-        WHERE c.nome LIKE @termoBusca 
-           OR c.cpf LIKE @termoBusca 
-           OR c.telefone LIKE @termoBusca
-           OR c.email LIKE @termoBusca
-           OR e.cidade LIKE @termoBusca
-           OR e.logradouro LIKE @termoBusca
-           OR e.bairro LIKE @termoBusca
+        AND (
+          c.nome LIKE @termoBusca 
+          OR c.cpf LIKE @termoBusca 
+          OR c.telefone LIKE @termoBusca
+          OR c.email LIKE @termoBusca
+          OR e.cidade LIKE @termoBusca
+          OR e.logradouro LIKE @termoBusca
+          OR e.bairro LIKE @termoBusca
+        )
       `;
     }
 
@@ -223,15 +230,13 @@ class ClientModel {
     if (dados.status !== undefined) {
       query += ', status = @status';
       req.input('status', sql.NVarChar, dados.status);
-      if (dados.status === 'INATIVO') {
-        query += ', ativo = 0';
-      } else if (dados.status === 'ATIVO') {
-        query += ', ativo = 1';
-      }
     }
     if (dados.ativo !== undefined) {
       query += ', ativo = @ativo';
       req.input('ativo', sql.Bit, dados.ativo ? 1 : 0);
+    } else if (dados.status !== undefined) {
+      query += ', ativo = @ativo_calc';
+      req.input('ativo_calc', sql.Bit, dados.status === 'ATIVO' ? 1 : 0);
     }
 
     query += `

@@ -393,6 +393,262 @@
           "value": "Bearer {{ _.token }}"
         }
       ]
+    },
+    {
+      "_id": "fld_order_status",
+      "_type": "request_group",
+      "parentId": "wrk_mediator_api",
+      "name": "5. Status da OS (RF05)"
+    },
+    {
+      "_id": "req_list_order_status",
+      "_type": "request",
+      "parentId": "fld_order_status",
+      "name": "Listar Status da OS",
+      "method": "GET",
+      "url": "{{ _.base_url }}/status-ordem?apenasAtivos=false",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "req_get_order_status_by_id",
+      "_type": "request",
+      "parentId": "fld_order_status",
+      "name": "Obter Status por ID",
+      "method": "GET",
+      "url": "{{ _.base_url }}/status-ordem/1",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "req_create_order_status",
+      "_type": "request",
+      "parentId": "fld_order_status",
+      "name": "Criar Novo Status (Admin)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/status-ordem",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"Aguardando Coleta Externa\",\n  \"descricao\": \"Equipamento embalado aguardando transportadora\",\n  \"cor\": \"#8B5CF6\",\n  \"ordem\": 9\n}"
+      }
+    },
+    {
+      "_id": "req_update_order_status",
+      "_type": "request",
+      "parentId": "fld_order_status",
+      "name": "Atualizar Status (Admin)",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/status-ordem/1",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"Aberto / Recebido no Balcão\",\n  \"descricao\": \"Ordem de serviço cadastrada e aguardando triagem\",\n  \"cor\": \"#3B82F6\",\n  \"ordem\": 1,\n  \"ativo\": true\n}"
+      }
+    },
+    {
+      "_id": "req_toggle_order_status",
+      "_type": "request",
+      "parentId": "fld_order_status",
+      "name": "Alternar Ativo/Inativo Status",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/status-ordem/1/status",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "fld_orders",
+      "_type": "request_group",
+      "parentId": "wrk_mediator_api",
+      "name": "6. Ordens de Serviço (RF06)"
+    },
+    {
+      "_id": "req_list_orders",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "Listar Ordens de Serviço",
+      "method": "GET",
+      "url": "{{ _.base_url }}/ordens-servico?pagina=1&limite=10",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "req_get_order_aux",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "Obter Auxiliares para Abertura de OS",
+      "method": "GET",
+      "url": "{{ _.base_url }}/ordens-servico/auxiliares",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "req_get_order_by_id",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "Obter Detalhes da OS por ID (Master-Detail)",
+      "method": "GET",
+      "url": "{{ _.base_url }}/ordens-servico/ID_DA_ORDEM",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "req_create_order",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "Abertura de Ordem de Serviço com Triagem",
+      "method": "POST",
+      "url": "{{ _.base_url }}/ordens-servico",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"clienteId\": \"ID_DO_CLIENTE\",\n  \"equipamentoId\": \"ID_DO_EQUIPAMENTO\",\n  \"tecnicoId\": \"ID_DO_TECNICO\",\n  \"tipoReparo\": \"SMARTPHONE\",\n  \"perguntasTriagem\": {\n    \"Aparelho liga normalmente?\": \"Sim, normalmente\",\n    \"Código de Bloqueio / PIN\": \"1234\",\n    \"Teve contato com água / líquidos?\": \"Não\",\n    \"Condição da tela\": \"Vidro frontal trincado mas touch funciona\",\n    \"Acessórios inclusos\": \"Cabo USB-C e capa de proteção\"\n  },\n  \"descricaoProblema\": \"Aparelho caiu no chão e trincou o vidro frontal. Touch ainda responde bem.\",\n  \"observacoesAtendimento\": \"Cliente solicita orçamento urgente para o mesmo dia.\"\n}"
+      }
+    },
+    {
+      "_id": "req_update_order_status_progress",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "Atualizar Status da OS (Evolução)",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/ordens-servico/ID_DA_ORDEM/status",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"statusId\": 4,\n  \"observacao\": \"Orçamento aprovado pelo cliente via telefone. Iniciando montagem da nova tela.\"\n}"
+      }
+    },
+    {
+      "_id": "req_add_order_technician_note",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "Adicionar Apontamento / Parecer Técnico",
+      "method": "POST",
+      "url": "{{ _.base_url }}/ordens-servico/ID_DA_ORDEM/observacoes-tecnicas",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"etapa\": \"Testes de Bancada\",\n  \"descricao\": \"Testado carregamento rápido e microfone com sucesso. Nenhuma anomalia térmica detectada.\",\n  \"laudoTecnico\": \"Substituição do módulo frontal concluída com sucesso. Testes de touch, display e sensores 100% validados.\"\n}"
+      }
+    },
+    {
+      "_id": "req_add_order_product",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "Consumir Peça na OS (Baixa em Estoque)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/ordens-servico/ID_DA_ORDEM/produtos",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"produtoId\": \"ID_DO_PRODUTO\",\n  \"quantidade\": 1,\n  \"precoUnitario\": 219.90\n}"
+      }
+    },
+    {
+      "_id": "req_remove_order_product",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "Remover Peça da OS (Estorno ao Estoque)",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/ordens-servico/ID_DA_ORDEM/produtos/ID_ITEM_PRODUTO_ORDEM",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
+    },
+    {
+      "_id": "req_toggle_order_active",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "Alternar Ativo/Inativo da OS (Soft Delete)",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/ordens-servico/ID_DA_ORDEM/alternar-ativo",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ]
     }
   ]
 }

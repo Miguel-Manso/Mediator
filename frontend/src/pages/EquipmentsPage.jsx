@@ -11,10 +11,14 @@ import {
   User,
   Hash,
   X,
+  Sliders,
 } from 'lucide-react';
 import { api } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import { EquipmentParametersModal } from '../components/equipments/EquipmentParametersModal';
 
 export const EquipmentsPage = () => {
+  const { ehAdmin, ehAtendente, apenasTecnico } = useAuth();
   const [equipamentos, setEquipamentos] = useState([]);
   const [busca, setBusca] = useState('');
   const [carregando, setCarregando] = useState(true);
@@ -25,12 +29,13 @@ export const EquipmentsPage = () => {
   const [marcas, setMarcas] = useState([]);
   const [modelos, setModelos] = useState([]);
 
-  // Estados do modal
+  // Estados dos modais
   const [mostrarModal, setMostrarModal] = useState(false);
+  const [mostrarModalParametros, setMostrarModalParametros] = useState(false);
   const [estaEditando, setEstaEditando] = useState(false);
   const [idEmEdicao, setIdEmEdicao] = useState(null);
 
-  // Estados do formulário
+  // Estados do formulário de equipamento
   const [descricao, setDescricao] = useState('');
   const [numeroSerie, setNumeroSerie] = useState('');
   const [clienteId, setClienteId] = useState('');
@@ -38,16 +43,7 @@ export const EquipmentsPage = () => {
   const [marcaId, setMarcaId] = useState('');
   const [modeloId, setModeloId] = useState('');
   const [ativo, setAtivo] = useState(true);
-
-  // Estados para criação dinâmica rápida de Categoria, Marca e Modelo
-  const [mostrarCriarCategoria, setMostrarCriarCategoria] = useState(false);
-  const [novaCategoriaNome, setNovaCategoriaNome] = useState('');
-  const [mostrarCriarMarca, setMostrarCriarMarca] = useState(false);
-  const [novaMarcaNome, setNovaMarcaNome] = useState('');
-  const [mostrarCriarModelo, setMostrarCriarModelo] = useState(false);
-  const [novoModeloNome, setNovoModeloNome] = useState('');
-  const [salvandoRapido, setSalvandoRapido] = useState(false);
-  const [erroRapido, setErroRapido] = useState('');
+  const [exibirInativos, setExibirInativos] = useState(false);
 
   const [salvando, setSalvando] = useState(false);
   const [erroFormulario, setErroFormulario] = useState('');
@@ -56,8 +52,11 @@ export const EquipmentsPage = () => {
   const buscarEquipamentos = async () => {
     try {
       setCarregando(true);
-      const url = `/equipamentos${busca ? `?busca=${encodeURIComponent(busca)}` : ''}`;
-      const resposta = await api.get(url);
+      const params = new URLSearchParams();
+      if (busca) params.append('busca', busca);
+      if (exibirInativos) params.append('incluirInativos', 'true');
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      const resposta = await api.get(`/equipamentos${qs}`);
       setEquipamentos(resposta.data);
     } catch (erro) {
       console.error('Erro ao carregar equipamentos:', erro);
@@ -86,7 +85,7 @@ export const EquipmentsPage = () => {
 
   useEffect(() => {
     buscarEquipamentos();
-  }, [busca]);
+  }, [busca, exibirInativos]);
 
   const abrirModalCriacao = () => {
     setErroFormulario('');
@@ -99,13 +98,6 @@ export const EquipmentsPage = () => {
     setMarcaId('');
     setModeloId('');
     setAtivo(true);
-    setMostrarCriarCategoria(false);
-    setNovaCategoriaNome('');
-    setMostrarCriarMarca(false);
-    setMostrarCriarModelo(false);
-    setNovaMarcaNome('');
-    setNovoModeloNome('');
-    setErroRapido('');
     setMostrarModal(true);
   };
 
@@ -120,81 +112,7 @@ export const EquipmentsPage = () => {
     setMarcaId(eq.marcaId || eq.marca_id || '');
     setModeloId(eq.modeloId || eq.modelo_id || '');
     setAtivo(eq.ativo !== false && eq.ativo !== 0);
-    setMostrarCriarCategoria(false);
-    setNovaCategoriaNome('');
-    setMostrarCriarMarca(false);
-    setMostrarCriarModelo(false);
-    setNovaMarcaNome('');
-    setNovoModeloNome('');
-    setErroRapido('');
     setMostrarModal(true);
-  };
-
-  // Criação rápida de Categoria
-  const aoCriarCategoriaRapida = async (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-    if (!novaCategoriaNome.trim()) return;
-
-    try {
-      setSalvandoRapido(true);
-      setErroRapido('');
-      const resp = await api.post('/equipamentos/categorias', { nome: novaCategoriaNome.trim() });
-      const catCriada = resp.data;
-      setCategorias((prev) => [...prev, catCriada]);
-      setCategoriaId(catCriada.id);
-      setNovaCategoriaNome('');
-      setMostrarCriarCategoria(false);
-    } catch (err) {
-      setErroRapido(err.response?.data?.error || 'Erro ao cadastrar categoria.');
-    } finally {
-      setSalvandoRapido(false);
-    }
-  };
-
-  // Criação rápida de Marca
-  const aoCriarMarcaRapida = async (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-    if (!novaMarcaNome.trim()) return;
-
-    try {
-      setSalvandoRapido(true);
-      setErroRapido('');
-      const resp = await api.post('/equipamentos/marcas', { nome: novaMarcaNome.trim() });
-      const marcaCriada = resp.data;
-      setMarcas((prev) => [...prev, marcaCriada]);
-      setMarcaId(marcaCriada.id);
-      setModeloId('');
-      setNovaMarcaNome('');
-      setMostrarCriarMarca(false);
-    } catch (err) {
-      setErroRapido(err.response?.data?.error || 'Erro ao cadastrar marca.');
-    } finally {
-      setSalvandoRapido(false);
-    }
-  };
-
-  // Criação rápida de Modelo
-  const aoCriarModeloRapido = async (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-    if (!novoModeloNome.trim() || !marcaId) return;
-
-    try {
-      setSalvandoRapido(true);
-      setErroRapido('');
-      const resp = await api.post('/equipamentos/modelos', {
-        nome: novoModeloNome.trim(),
-        marcaId,
-      });
-      const modeloCriado = resp.data;
-      setModelos((prev) => [...prev, modeloCriado]);
-      setModeloId(modeloCriado.id);
-      setNovoModeloNome('');
-      setMostrarCriarModelo(false);
-    } catch (err) {
-      setErroRapido(err.response?.data?.error || 'Erro ao cadastrar modelo.');
-    } finally {
-      setSalvandoRapido(false);
-    }
   };
 
   // Filtragem dinâmica de modelos pela marca selecionada
@@ -275,23 +193,44 @@ export const EquipmentsPage = () => {
           <h1 className="page-title">Equipamentos</h1>
           <p className="page-subtitle">Controle de aparelhos e dispositivos vinculados aos clientes</p>
         </div>
-        <button onClick={abrirModalCriacao} className="primary-action">
-          <Plus className="w-4 h-4" />
-          <span>Novo Equipamento</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMostrarModalParametros(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 active:translate-y-px"
+          >
+            <Sliders className="w-4 h-4 text-slate-600" />
+            <span>Parâmetro de Equipamento</span>
+          </button>
+          <button onClick={abrirModalCriacao} className="primary-action">
+            <Plus className="w-4 h-4" />
+            <span>Novo Equipamento</span>
+          </button>
+        </div>
       </div>
 
-      {/* Barra de Busca */}
-      <div className="relative">
-        <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-        <input
-          type="text"
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar por descrição, número de série, cliente, marca ou modelo..."
-          className="search-control"
-          maxLength={150}
-        />
+      {/* Barra de Busca e Filtros */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por descrição, número de série, cliente, marca ou modelo..."
+            className="search-control"
+            maxLength={150}
+          />
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-600 bg-white border border-slate-200 px-3.5 py-2.5 rounded-xl shadow-xs hover:bg-slate-50 transition shrink-0">
+          <input
+            type="checkbox"
+            checked={exibirInativos}
+            onChange={(e) => setExibirInativos(e.target.checked)}
+            className="rounded border-slate-300 text-slate-900 focus:ring-slate-400 h-4 w-4"
+          />
+          <span>Exibir inativos</span>
+        </label>
       </div>
 
       {/* Tabela de Equipamentos */}
@@ -331,9 +270,9 @@ export const EquipmentsPage = () => {
                       <td className="px-6 py-4">
                         <div className="font-semibold text-slate-900">{eq.descricao}</div>
                         {eq.numeroSerie && (
-                          <div className="flex items-center gap-1 text-xs text-slate-400 mt-0.5 font-mono">
+                          <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5 font-mono">
                             <Hash className="w-3 h-3 text-slate-400" />
-                            <span>S/N: {eq.numeroSerie}</span>
+                            <span>{/^\d+$/.test(String(eq.numeroSerie).trim()) ? `ID: ${eq.numeroSerie}` : `S/N: ${eq.numeroSerie}`}</span>
                           </div>
                         )}
                       </td>
@@ -428,246 +367,65 @@ export const EquipmentsPage = () => {
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-semibold text-slate-700">
-                    Categoria de Equipamento *
-                  </label>
-                  <button
-                    type="button"
-                    title="Cadastrar Nova Categoria"
-                    onClick={() => {
-                      setMostrarCriarCategoria(!mostrarCriarCategoria);
-                      setMostrarCriarMarca(false);
-                      setMostrarCriarModelo(false);
-                      setNovaCategoriaNome('');
-                      setErroRapido('');
-                    }}
-                    className="text-[11px] text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-0.5 hover:underline"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>{mostrarCriarCategoria ? 'Cancelar' : 'Nova Categoria'}</span>
-                  </button>
-                </div>
-
-                {mostrarCriarCategoria ? (
-                  <div className="p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg mb-2">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-semibold text-blue-950">Nova Categoria</span>
-                      <button
-                        type="button"
-                        onClick={() => setMostrarCriarCategoria(false)}
-                        className="text-slate-400 hover:text-slate-600 p-0.5"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="text"
-                        value={novaCategoriaNome}
-                        onChange={(e) => setNovaCategoriaNome(e.target.value)}
-                        placeholder="Ex: Drone / Câmera / Console"
-                        maxLength={100}
-                        className="form-control text-xs py-1.5"
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            aoCriarCategoriaRapida(e);
-                          }
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={aoCriarCategoriaRapida}
-                        disabled={salvandoRapido || !novaCategoriaNome.trim()}
-                        className="primary-action text-xs px-2.5 py-1.5 whitespace-nowrap"
-                      >
-                        {salvandoRapido ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Salvar Categoria'}
-                      </button>
-                    </div>
-                    {erroRapido && (
-                      <p className="text-[11px] text-red-600 mt-1">{erroRapido}</p>
-                    )}
-                  </div>
-                ) : (
-                  <select
-                    value={categoriaId}
-                    onChange={(e) => setCategoriaId(e.target.value)}
-                    required
-                    className="form-control"
-                  >
-                    <option value="">Selecione uma categoria...</option>
-                    {categorias.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.nome}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Categoria de Equipamento *
+                </label>
+                <select
+                  value={categoriaId}
+                  onChange={(e) => setCategoriaId(e.target.value)}
+                  required
+                  className="form-control"
+                >
+                  <option value="">Selecione uma categoria...</option>
+                  {categorias.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.nome}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-slate-700">
-                      Marca
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMostrarCriarMarca(!mostrarCriarMarca);
-                        setMostrarCriarModelo(false);
-                        setNovaMarcaNome('');
-                        setErroRapido('');
-                      }}
-                      className="text-[11px] text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-0.5 hover:underline"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>{mostrarCriarMarca ? 'Cancelar' : 'Nova Marca'}</span>
-                    </button>
-                  </div>
-
-                  {mostrarCriarMarca ? (
-                    <div className="p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg mb-2">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs font-semibold text-blue-950">Nova Marca</span>
-                        <button
-                          type="button"
-                          onClick={() => setMostrarCriarMarca(false)}
-                          className="text-slate-400 hover:text-slate-600 p-0.5"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                      <div className="flex gap-1.5">
-                        <input
-                          type="text"
-                          value={novaMarcaNome}
-                          onChange={(e) => setNovaMarcaNome(e.target.value)}
-                          placeholder="Ex: Asus, Acer, Xiaomi"
-                          maxLength={100}
-                          className="form-control text-xs py-1.5"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              aoCriarMarcaRapida(e);
-                            }
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={aoCriarMarcaRapida}
-                          disabled={salvandoRapido || !novaMarcaNome.trim()}
-                          className="primary-action text-xs px-2.5 py-1.5 whitespace-nowrap"
-                        >
-                          {salvandoRapido ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Salvar'}
-                        </button>
-                      </div>
-                      {erroRapido && (
-                        <p className="text-[11px] text-red-600 mt-1">{erroRapido}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <select
-                      value={marcaId}
-                      onChange={(e) => {
-                        setMarcaId(e.target.value);
-                        setModeloId('');
-                      }}
-                      className="form-control"
-                    >
-                      <option value="">Selecione a marca...</option>
-                      {marcas.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.nome}
-                        </option>
-                      ))}
-                    </select>
-                  )}
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Marca
+                  </label>
+                  <select
+                    value={marcaId}
+                    onChange={(e) => {
+                      setMarcaId(e.target.value);
+                      setModeloId('');
+                    }}
+                    className="form-control"
+                  >
+                    <option value="">Selecione a marca...</option>
+                    {marcas.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.nome}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-slate-700">
-                      Modelo
-                    </label>
-                    {marcaId && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMostrarCriarModelo(!mostrarCriarModelo);
-                          setMostrarCriarMarca(false);
-                          setNovoModeloNome('');
-                          setErroRapido('');
-                        }}
-                        className="text-[11px] text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-0.5 hover:underline"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>{mostrarCriarModelo ? 'Cancelar' : 'Novo Modelo'}</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {mostrarCriarModelo ? (
-                    <div className="p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg mb-2">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs font-semibold text-blue-950">
-                          Novo Modelo ({marcas.find((m) => String(m.id) === String(marcaId))?.nome || 'Marca'})
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setMostrarCriarModelo(false)}
-                          className="text-slate-400 hover:text-slate-600 p-0.5"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                      <div className="flex gap-1.5">
-                        <input
-                          type="text"
-                          value={novoModeloNome}
-                          onChange={(e) => setNovoModeloNome(e.target.value)}
-                          placeholder="Ex: Vivobook 15, Aspire 5"
-                          maxLength={100}
-                          className="form-control text-xs py-1.5"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              aoCriarModeloRapido(e);
-                            }
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={aoCriarModeloRapido}
-                          disabled={salvandoRapido || !novoModeloNome.trim()}
-                          className="primary-action text-xs px-2.5 py-1.5 whitespace-nowrap"
-                        >
-                          {salvandoRapido ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Salvar'}
-                        </button>
-                      </div>
-                      {erroRapido && (
-                        <p className="text-[11px] text-red-600 mt-1">{erroRapido}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <select
-                      value={modeloId}
-                      onChange={(e) => setModeloId(e.target.value)}
-                      disabled={!marcaId}
-                      className="form-control disabled:bg-slate-50 disabled:text-slate-400"
-                    >
-                      <option value="">{marcaId ? 'Selecione o modelo...' : 'Escolha a marca primeiro'}</option>
-                      {modelosFiltrados.map((mod) => (
-                        <option key={mod.id} value={mod.id}>
-                          {mod.nome}
-                        </option>
-                      ))}
-                    </select>
-                  )}
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Modelo
+                  </label>
+                  <select
+                    value={modeloId}
+                    onChange={(e) => setModeloId(e.target.value)}
+                    disabled={!marcaId}
+                    className="form-control disabled:bg-slate-50 disabled:text-slate-400"
+                  >
+                    <option value="">
+                      {marcaId ? 'Selecione o modelo...' : 'Escolha a marca primeiro'}
+                    </option>
+                    {modelosFiltrados.map((mod) => (
+                      <option key={mod.id} value={mod.id}>
+                        {mod.nome}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -687,14 +445,19 @@ export const EquipmentsPage = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Número de Série / Identificador (Opcional)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Número de Série / Identificador (Opcional)
+                  </label>
+                  <span className="text-[10px] text-slate-400">
+                    Se vazio, gera ID automático (1, 2, 3...)
+                  </span>
+                </div>
                 <input
                   type="text"
                   value={numeroSerie}
                   onChange={(e) => setNumeroSerie(e.target.value)}
-                  placeholder="Ex: SN-987456123 / IMEI"
+                  placeholder="Ex: SN-987456123 (ou deixe vazio para gerar ID 1, 2...)"
                   maxLength={100}
                   className="form-control"
                 />
@@ -737,6 +500,17 @@ export const EquipmentsPage = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de Parâmetros de Equipamento (Categorias, Marcas e Modelos) */}
+      <EquipmentParametersModal
+        aberto={mostrarModalParametros}
+        aoFechar={() => setMostrarModalParametros(false)}
+        categorias={categorias}
+        marcas={marcas}
+        modelos={modelos}
+        aoAtualizar={carregarAuxiliares}
+      />
     </div>
   );
 };
+

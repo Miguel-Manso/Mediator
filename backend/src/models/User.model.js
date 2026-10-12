@@ -1,9 +1,10 @@
 const { getPool, sql } = require('../config/db');
 
 class UserModel {
-  static async findAll() {
+  static async findAll({ apenasAtivos = true, busca = '' } = {}) {
     const pool = await getPool();
-    const result = await pool.query(`
+    const req = pool.request();
+    let query = `
       SELECT 
         u.id, 
         u.nome, 
@@ -32,9 +33,21 @@ class UserModel {
         e.uf
       FROM usuarios u
       LEFT JOIN enderecos e ON u.endereco_id = e.id
-      ORDER BY u.nome ASC
-    `);
+      WHERE 1=1
+    `;
 
+    if (apenasAtivos) {
+      query += ' AND u.ativo = 1';
+    }
+
+    if (busca && String(busca).trim() !== '') {
+      req.input('busca', sql.NVarChar, `%${String(busca).trim()}%`);
+      query += ' AND (u.nome LIKE @busca OR u.email LIKE @busca OR u.cpf LIKE @busca)';
+    }
+
+    query += ' ORDER BY u.nome ASC';
+
+    const result = await req.query(query);
     return result.recordset;
   }
 
@@ -197,15 +210,13 @@ class UserModel {
     if (dados.status !== undefined) {
       query += ', status = @status';
       req.input('status', sql.NVarChar, dados.status);
-      if (dados.status === 'INATIVO') {
-        query += ', ativo = 0';
-      } else if (dados.status === 'ATIVO') {
-        query += ', ativo = 1';
-      }
     }
     if (dados.ativo !== undefined) {
       query += ', ativo = @ativo';
       req.input('ativo', sql.Bit, dados.ativo ? 1 : 0);
+    } else if (dados.status !== undefined) {
+      query += ', ativo = @ativo_calc';
+      req.input('ativo_calc', sql.Bit, dados.status === 'ATIVO' ? 1 : 0);
     }
     if (dados.telefone !== undefined) {
       query += ', telefone = @telefone';

@@ -5,9 +5,12 @@ const AddressModel = require('../models/Address.model');
 
 const userController = {
   // Listagem de colaboradores usando a camada Model
-  async listar(_req, res) {
+  async listar(req, res) {
     try {
-      const usuarios = await UserModel.findAll();
+      const busca = req.query?.busca || req.query?.search || '';
+      const incluirInativos = req.query?.incluirInativos === 'true' || req.query?.inativos === 'true';
+      const apenasAtivos = !incluirInativos && req.query?.apenasAtivos !== 'false';
+      const usuarios = await UserModel.findAll({ apenasAtivos, busca });
       return res.status(200).json(usuarios);
     } catch (erro) {
       console.error('Erro ao listar usuários:', erro);

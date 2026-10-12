@@ -36,13 +36,17 @@ export const UsersPage = () => {
   const [cep, setCep] = useState('');
 
   const [status, setStatus] = useState('ATIVO');
+  const [exibirInativos, setExibirInativos] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erroFormulario, setErroFormulario] = useState('');
 
   const buscarUsuarios = async () => {
     try {
       setCarregando(true);
-      const resposta = await api.get('/usuarios');
+      const params = new URLSearchParams();
+      if (exibirInativos) params.append('incluirInativos', 'true');
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      const resposta = await api.get(`/usuarios${qs}`);
       setUsuarios(resposta.data);
     } catch (erro) {
       console.error('Erro ao carregar usuários:', erro);
@@ -53,7 +57,7 @@ export const UsersPage = () => {
 
   useEffect(() => {
     buscarUsuarios();
-  }, []);
+  }, [exibirInativos]);
 
   const abrirModalCriacao = () => {
     setErroFormulario('');
@@ -217,17 +221,28 @@ export const UsersPage = () => {
         </button>
       </div>
 
-      {/* Barra de Busca */}
-      <div className="relative">
-        <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-        <input
-          type="text"
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar usuário por nome, e-mail ou CPF..."
-          className="search-control"
-          maxLength={180}
-        />
+      {/* Barra de Busca e Filtros */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar usuário por nome, e-mail ou CPF..."
+            className="search-control"
+            maxLength={180}
+          />
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-600 bg-white border border-slate-200 px-3.5 py-2.5 rounded-xl shadow-xs hover:bg-slate-50 transition shrink-0">
+          <input
+            type="checkbox"
+            checked={exibirInativos}
+            onChange={(e) => setExibirInativos(e.target.checked)}
+            className="rounded border-slate-300 text-slate-900 focus:ring-slate-400 h-4 w-4"
+          />
+          <span>Exibir inativos</span>
+        </label>
       </div>
 
       {/* Tabela de Usuarios */}
@@ -517,10 +532,12 @@ export const UsersPage = () => {
                     </label>
                     <input
                       type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={numero}
-                      onChange={(e) => setNumero(e.target.value)}
+                      onChange={(e) => setNumero(e.target.value.replace(/\D/g, ''))}
                       placeholder="123"
-                      maxLength={20}
+                      maxLength={10}
                       className="form-control"
                     />
                   </div>

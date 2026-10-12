@@ -6,6 +6,8 @@ const clientRoutes = require('./client.routes');
 const userRoutes = require('./user.routes');
 const equipmentRoutes = require('./equipment.routes');
 const productRoutes = require('./product.routes');
+const orderStatusRoutes = require('./orderStatus.routes');
+const orderRoutes = require('./order.routes');
 
 const routes = Router();
 
@@ -29,8 +31,17 @@ routes.use('/equipments', authMiddleware, equipmentRoutes);
 routes.use('/produtos', authMiddleware, productRoutes);
 routes.use('/products', authMiddleware, productRoutes);
 
+// Rotas de Status de Ordem de Servico (RF05)
+routes.use('/status-ordem', authMiddleware, orderStatusRoutes);
+routes.use('/order-statuses', authMiddleware, orderStatusRoutes);
+
+// Rotas de Ordens de Servico (RF06)
+routes.use('/ordens-servico', authMiddleware, orderRoutes);
+routes.use('/orders', authMiddleware, orderRoutes);
+
 // Rotas protegidas de usuarios: ACESSO EXCLUSIVO PARA ADMIN
 routes.use('/usuarios', authMiddleware, roleMiddleware(['ADMIN']), userRoutes);
 routes.use('/users', authMiddleware, roleMiddleware(['ADMIN']), userRoutes);
 
 module.exports = routes;
+

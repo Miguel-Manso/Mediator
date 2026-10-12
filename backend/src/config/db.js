@@ -90,15 +90,15 @@ async function initDatabase() {
       BEGIN
         IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('usuarios') AND name = 'cpf')
         BEGIN
-          ALTER TABLE usuarios ADD cpf NVARCHAR(14) NULL;
+          EXEC('ALTER TABLE usuarios ADD cpf NVARCHAR(14) NULL');
         END
         IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('usuarios') AND name = 'ativo')
         BEGIN
-          ALTER TABLE usuarios ADD ativo BIT DEFAULT 1;
+          EXEC('ALTER TABLE usuarios ADD ativo BIT DEFAULT 1');
         END
         IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('usuarios') AND name = 'endereco_id')
         BEGIN
-          ALTER TABLE usuarios ADD endereco_id VARCHAR(36) NULL FOREIGN KEY REFERENCES enderecos(id) ON DELETE SET NULL;
+          EXEC('ALTER TABLE usuarios ADD endereco_id VARCHAR(36) NULL FOREIGN KEY REFERENCES enderecos(id) ON DELETE SET NULL');
         END
 
         -- Migração e remoção de coluna redundante 'cidade' em usuarios
@@ -505,6 +505,214 @@ async function initDatabase() {
       IF NOT EXISTS (SELECT 1 FROM produtos WHERE nome = 'Fonte ATX 500W 80 Plus Bronze')
         INSERT INTO produtos (id, nome, descricao, preco, estoque, ativo)
         VALUES (LOWER(NEWID()), 'Fonte ATX 500W 80 Plus Bronze', 'Fonte bivolt com PFC ativo para computadores de escritório e gamers', 289.00, 4, 1);
+
+      -- 12. Tabela de status da ordem (RF05)
+      IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'status_ordem')
+      BEGIN
+        CREATE TABLE status_ordem (
+          id INT PRIMARY KEY,
+          nome NVARCHAR(50) NOT NULL,
+          descricao NVARCHAR(100) NULL,
+          cor NVARCHAR(20) NULL,
+          ordem INT DEFAULT 0,
+          ativo BIT DEFAULT 1
+        );
+      END
+      ELSE
+      BEGIN
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('status_ordem') AND name = 'cor')
+          ALTER TABLE status_ordem ADD cor NVARCHAR(20) NULL;
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('status_ordem') AND name = 'ordem')
+          ALTER TABLE status_ordem ADD ordem INT DEFAULT 0;
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('status_ordem') AND name = 'ativo')
+          ALTER TABLE status_ordem ADD ativo BIT DEFAULT 1;
+      END
+
+      -- Seeds canônicos de status_ordem (RF05)
+      IF NOT EXISTS (SELECT 1 FROM status_ordem WHERE id = 1) 
+        INSERT INTO status_ordem (id, nome, descricao, cor, ordem, ativo) VALUES (1, 'Aberto / Recebido', 'Ordem de serviço cadastrada e aguardando triagem', '#3B82F6', 1, 1);
+      ELSE
+        UPDATE status_ordem SET nome = 'Aberto / Recebido', descricao = 'Ordem de serviço cadastrada e aguardando triagem', cor = '#3B82F6', ordem = 1, ativo = 1 WHERE id = 1;
+
+      IF NOT EXISTS (SELECT 1 FROM status_ordem WHERE id = 2) 
+        INSERT INTO status_ordem (id, nome, descricao, cor, ordem, ativo) VALUES (2, 'Em Análise / Diagnóstico', 'Equipamento em diagnóstico técnico para orçamento', '#8B5CF6', 2, 1);
+      ELSE
+        UPDATE status_ordem SET nome = 'Em Análise / Diagnóstico', descricao = 'Equipamento em diagnóstico técnico para orçamento', cor = '#8B5CF6', ordem = 2, ativo = 1 WHERE id = 2;
+
+      IF NOT EXISTS (SELECT 1 FROM status_ordem WHERE id = 3) 
+        INSERT INTO status_ordem (id, nome, descricao, cor, ordem, ativo) VALUES (3, 'Aguardando Aprovação', 'Orçamento e laudo enviados aguardando resposta do cliente', '#F59E0B', 3, 1);
+      ELSE
+        UPDATE status_ordem SET nome = 'Aguardando Aprovação', descricao = 'Orçamento e laudo enviados aguardando resposta do cliente', cor = '#F59E0B', ordem = 3, ativo = 1 WHERE id = 3;
+
+      IF NOT EXISTS (SELECT 1 FROM status_ordem WHERE id = 4) 
+        INSERT INTO status_ordem (id, nome, descricao, cor, ordem, ativo) VALUES (4, 'Aprovado pelo Cliente', 'Cliente aprovou o orçamento de peças e serviços para início do reparo', '#10B981', 4, 1);
+      ELSE
+        UPDATE status_ordem SET nome = 'Aprovado pelo Cliente', descricao = 'Cliente aprovou o orçamento de peças e serviços para início do reparo', cor = '#10B981', ordem = 4, ativo = 1 WHERE id = 4;
+
+      IF NOT EXISTS (SELECT 1 FROM status_ordem WHERE id = 5) 
+        INSERT INTO status_ordem (id, nome, descricao, cor, ordem, ativo) VALUES (5, 'Em Reparo / Em Andamento', 'Serviço aprovado e técnico realizando manutenção na bancada', '#06B6D4', 5, 1);
+      ELSE
+        UPDATE status_ordem SET nome = 'Em Reparo / Em Andamento', descricao = 'Serviço aprovado e técnico realizando manutenção na bancada', cor = '#06B6D4', ordem = 5, ativo = 1 WHERE id = 5;
+
+      IF NOT EXISTS (SELECT 1 FROM status_ordem WHERE id = 6) 
+        INSERT INTO status_ordem (id, nome, descricao, cor, ordem, ativo) VALUES (6, 'Aguardando Peças', 'Manutenção pausada aguardando chegada de peças/insumos', '#EC4899', 6, 1);
+      ELSE
+        UPDATE status_ordem SET nome = 'Aguardando Peças', descricao = 'Manutenção pausada aguardando chegada de peças/insumos', cor = '#EC4899', ordem = 6, ativo = 1 WHERE id = 6;
+
+      IF NOT EXISTS (SELECT 1 FROM status_ordem WHERE id = 7) 
+        INSERT INTO status_ordem (id, nome, descricao, cor, ordem, ativo) VALUES (7, 'Testes Finais / Concluído', 'Reparo finalizado e passando por testes de validação', '#84CC16', 7, 1);
+      ELSE
+        UPDATE status_ordem SET nome = 'Testes Finais / Concluído', descricao = 'Reparo finalizado e passando por testes de validação', cor = '#84CC16', ordem = 7, ativo = 1 WHERE id = 7;
+
+      IF NOT EXISTS (SELECT 1 FROM status_ordem WHERE id = 8) 
+        INSERT INTO status_ordem (id, nome, descricao, cor, ordem, ativo) VALUES (8, 'Entregue / Finalizado', 'Equipamento entregue ao cliente e ordem finalizada no balcão', '#64748B', 8, 1);
+      ELSE
+        UPDATE status_ordem SET nome = 'Entregue / Finalizado', descricao = 'Equipamento entregue ao cliente e ordem finalizada no balcão', cor = '#64748B', ordem = 8, ativo = 1 WHERE id = 8;
+
+      IF NOT EXISTS (SELECT 1 FROM status_ordem WHERE id = 9) 
+        INSERT INTO status_ordem (id, nome, descricao, cor, ordem, ativo) VALUES (9, 'Cancelado', 'Ordem cancelada ou orçamento reprovado pelo cliente', '#EF4444', 9, 1);
+      ELSE
+        UPDATE status_ordem SET nome = 'Cancelado', descricao = 'Ordem cancelada ou orçamento reprovado pelo cliente', cor = '#EF4444', ordem = 9, ativo = 1 WHERE id = 9;
+
+      -- 13. Tabela de ordens de servico (RF06)
+      IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ordens_servico')
+      BEGIN
+        CREATE TABLE ordens_servico (
+          id VARCHAR(36) PRIMARY KEY DEFAULT LOWER(NEWID()),
+          numero_ordem NVARCHAR(30) UNIQUE NOT NULL,
+          tipo_reparo NVARCHAR(50) NULL,
+          perguntas_triagem NVARCHAR(MAX) NULL,
+          descricao_problema NVARCHAR(MAX) NOT NULL,
+          laudo_tecnico NVARCHAR(MAX) NULL,
+          observacoes_atendimento NVARCHAR(MAX) NULL,
+          status_id INT NOT NULL FOREIGN KEY REFERENCES status_ordem(id),
+          cliente_id VARCHAR(36) NOT NULL FOREIGN KEY REFERENCES clientes(id),
+          equipamento_id VARCHAR(36) NOT NULL FOREIGN KEY REFERENCES equipamentos(id),
+          atendente_id VARCHAR(36) NOT NULL FOREIGN KEY REFERENCES usuarios(id),
+          tecnico_id VARCHAR(36) NULL FOREIGN KEY REFERENCES usuarios(id),
+          ativo BIT DEFAULT 1,
+          aberto_em DATETIME2 DEFAULT GETDATE(),
+          fechado_em DATETIME2 NULL,
+          criado_em DATETIME2 DEFAULT GETDATE(),
+          atualizado_em DATETIME2 DEFAULT GETDATE()
+        );
+        CREATE INDEX idx_ordens_cliente ON ordens_servico(cliente_id);
+        CREATE INDEX idx_ordens_status ON ordens_servico(status_id);
+        CREATE INDEX idx_ordens_tecnico ON ordens_servico(tecnico_id);
+        CREATE INDEX idx_ordens_aberto_em ON ordens_servico(aberto_em DESC);
+        CREATE INDEX idx_ordens_ativo ON ordens_servico(ativo);
+      END
+      ELSE
+      BEGIN
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ordens_servico') AND name = 'tipo_reparo')
+          ALTER TABLE ordens_servico ADD tipo_reparo NVARCHAR(50) NULL;
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ordens_servico') AND name = 'perguntas_triagem')
+          ALTER TABLE ordens_servico ADD perguntas_triagem NVARCHAR(MAX) NULL;
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ordens_servico') AND name = 'observacoes_atendimento')
+          ALTER TABLE ordens_servico ADD observacoes_atendimento NVARCHAR(MAX) NULL;
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ordens_servico') AND name = 'ativo')
+          ALTER TABLE ordens_servico ADD ativo BIT DEFAULT 1;
+      END
+
+      -- 14. Tabela de produtos_ordem (RF06)
+      IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'produtos_ordem')
+      BEGIN
+        CREATE TABLE produtos_ordem (
+          id VARCHAR(36) PRIMARY KEY DEFAULT LOWER(NEWID()),
+          ordem_id VARCHAR(36) NOT NULL FOREIGN KEY REFERENCES ordens_servico(id) ON DELETE CASCADE,
+          produto_id VARCHAR(36) NOT NULL FOREIGN KEY REFERENCES produtos(id),
+          quantidade INT NOT NULL DEFAULT 1,
+          preco_unitario DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+          baixado BIT NOT NULL DEFAULT 0,
+          baixado_em DATETIME2 NULL,
+          baixado_por VARCHAR(36) NULL FOREIGN KEY REFERENCES usuarios(id),
+          baixado_estoque BIT DEFAULT 0,
+          usuario_id VARCHAR(36) NULL FOREIGN KEY REFERENCES usuarios(id),
+          ativo BIT DEFAULT 1,
+          criado_em DATETIME2 DEFAULT GETDATE(),
+          atualizado_em DATETIME2 DEFAULT GETDATE()
+        );
+        CREATE INDEX idx_produtos_ordem_ordem ON produtos_ordem(ordem_id);
+      END
+      ELSE
+      BEGIN
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('produtos_ordem') AND name = 'usuario_id')
+          EXEC('ALTER TABLE produtos_ordem ADD usuario_id VARCHAR(36) NULL FOREIGN KEY REFERENCES usuarios(id)');
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('produtos_ordem') AND name = 'baixado')
+        BEGIN
+          EXEC('ALTER TABLE produtos_ordem ADD baixado BIT NOT NULL DEFAULT 0');
+          EXEC('ALTER TABLE produtos_ordem ADD baixado_em DATETIME2 NULL');
+          EXEC('ALTER TABLE produtos_ordem ADD baixado_por VARCHAR(36) NULL FOREIGN KEY REFERENCES usuarios(id)');
+        END
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('produtos_ordem') AND name = 'baixado_estoque')
+          EXEC('ALTER TABLE produtos_ordem ADD baixado_estoque BIT DEFAULT 0');
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('produtos_ordem') AND name = 'ativo')
+          EXEC('ALTER TABLE produtos_ordem ADD ativo BIT DEFAULT 1');
+
+        -- Sincronizar dados prévios se baixado_estoque existir
+        IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('produtos_ordem') AND name = 'baixado')
+           AND EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('produtos_ordem') AND name = 'baixado_estoque')
+        BEGIN
+          EXEC('UPDATE produtos_ordem SET baixado = baixado_estoque WHERE baixado = 0 AND baixado_estoque = 1');
+        END
+      END
+
+      -- 15. Tabela de historico_ordens (RF06)
+      IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'historico_ordens')
+      BEGIN
+        CREATE TABLE historico_ordens (
+          id VARCHAR(36) PRIMARY KEY DEFAULT LOWER(NEWID()),
+          ordem_id VARCHAR(36) NOT NULL FOREIGN KEY REFERENCES ordens_servico(id) ON DELETE CASCADE,
+          usuario_id VARCHAR(36) NOT NULL FOREIGN KEY REFERENCES usuarios(id),
+          tipo_registro NVARCHAR(30) NOT NULL DEFAULT 'PARECER',
+          status_id INT NULL FOREIGN KEY REFERENCES status_ordem(id),
+          etapa NVARCHAR(50) NULL,
+          descricao NVARCHAR(MAX) NOT NULL,
+          ativo BIT DEFAULT 1,
+          criado_em DATETIME2 DEFAULT GETDATE()
+        );
+        CREATE INDEX idx_historico_ordem ON historico_ordens(ordem_id);
+      END
+      ELSE
+      BEGIN
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('historico_ordens') AND name = 'tipo_registro')
+          EXEC('ALTER TABLE historico_ordens ADD tipo_registro NVARCHAR(30) DEFAULT ''PARECER''');
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('historico_ordens') AND name = 'status_id')
+          EXEC('ALTER TABLE historico_ordens ADD status_id INT NULL FOREIGN KEY REFERENCES status_ordem(id)');
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('historico_ordens') AND name = 'etapa')
+          EXEC('ALTER TABLE historico_ordens ADD etapa NVARCHAR(50) NULL');
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('historico_ordens') AND name = 'ativo')
+          EXEC('ALTER TABLE historico_ordens ADD ativo BIT DEFAULT 1');
+
+        -- Backfill dinâmico do tipo_registro para não quebrar o parse time do SQL Server
+        EXEC('UPDATE historico_ordens SET tipo_registro = ''STATUS'' WHERE status_id IS NOT NULL AND (tipo_registro IS NULL OR tipo_registro = ''PARECER'')');
+        EXEC('UPDATE historico_ordens SET tipo_registro = ''PARECER'' WHERE tipo_registro IS NULL');
+      END
+
+      -- 16. Tabela de movimentacoes_status (RF06)
+      IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'movimentacoes_status')
+      BEGIN
+        CREATE TABLE movimentacoes_status (
+          id VARCHAR(36) PRIMARY KEY DEFAULT LOWER(NEWID()),
+          ordem_id VARCHAR(36) NOT NULL FOREIGN KEY REFERENCES ordens_servico(id) ON DELETE CASCADE,
+          status_id INT NOT NULL FOREIGN KEY REFERENCES status_ordem(id),
+          usuario_id VARCHAR(36) NOT NULL FOREIGN KEY REFERENCES usuarios(id),
+          ativo BIT DEFAULT 1,
+          criado_em DATETIME2 DEFAULT GETDATE()
+        );
+        CREATE INDEX idx_movimentacoes_ordem ON movimentacoes_status(ordem_id);
+      END
+      ELSE
+      BEGIN
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('movimentacoes_status') AND name = 'ativo')
+          ALTER TABLE movimentacoes_status ADD ativo BIT DEFAULT 1;
+      END
+
+      -- Drop da tabela tipos_reparo caso tenha sido criada anteriormente
+      IF OBJECT_ID('tipos_reparo', 'U') IS NOT NULL
+      BEGIN
+        DROP TABLE tipos_reparo;
+      END
     `);
   } catch (erro) {
     console.error('Erro ao inicializar tabelas no SQL Server:', erro);

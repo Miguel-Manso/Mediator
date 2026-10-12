@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, Phone, MapPin, Loader2, Edit, UserX } from 'lucide-react';
 import { api } from '../services/api';
 import { maskCPF, maskPhone, maskCEP } from '../utils/masks';
+import { useAuth } from '../contexts/AuthContext';
 
 export const ClientsPage = () => {
+  const { ehAdmin, ehAtendente, apenasTecnico } = useAuth();
   const [clientes, setClientes] = useState([]);
   const [busca, setBusca] = useState('');
   const [carregando, setCarregando] = useState(true);
@@ -30,13 +32,18 @@ export const ClientsPage = () => {
 
   const [observacoes, setObservacoes] = useState('');
   const [status, setStatus] = useState('ATIVO');
+  const [exibirInativos, setExibirInativos] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erroFormulario, setErroFormulario] = useState('');
 
   const buscarClientes = async () => {
     try {
       setCarregando(true);
-      const resposta = await api.get(`/clientes${busca ? `?busca=${encodeURIComponent(busca)}` : ''}`);
+      const params = new URLSearchParams();
+      if (busca) params.append('busca', busca);
+      if (exibirInativos) params.append('incluirInativos', 'true');
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      const resposta = await api.get(`/clientes${qs}`);
       setClientes(resposta.data);
     } catch (erro) {
       console.error('Erro ao carregar clientes:', erro);
@@ -47,7 +54,7 @@ export const ClientsPage = () => {
 
   useEffect(() => {
     buscarClientes();
-  }, [busca]);
+  }, [busca, exibirInativos]);
 
   const abrirModalCriacao = () => {
     setErroFormulario('');
@@ -173,17 +180,28 @@ export const ClientsPage = () => {
         </button>
       </div>
 
-      {/* Barra de Busca */}
-      <div className="relative">
-        <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-        <input
-          type="text"
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar cliente por nome, CPF, telefone ou cidade..."
-          className="search-control"
-          maxLength={150}
-        />
+      {/* Barra de Busca e Filtros */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar cliente por nome, CPF, telefone ou cidade..."
+            className="search-control"
+            maxLength={150}
+          />
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-600 bg-white border border-slate-200 px-3.5 py-2.5 rounded-xl shadow-xs hover:bg-slate-50 transition shrink-0">
+          <input
+            type="checkbox"
+            checked={exibirInativos}
+            onChange={(e) => setExibirInativos(e.target.checked)}
+            className="rounded border-slate-300 text-slate-900 focus:ring-slate-400 h-4 w-4"
+          />
+          <span>Exibir inativos</span>
+        </label>
       </div>
 
       {/* Tabela de Clientes */}
@@ -412,10 +430,12 @@ export const ClientsPage = () => {
                     </label>
                     <input
                       type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={numero}
-                      onChange={(e) => setNumero(e.target.value)}
+                      onChange={(e) => setNumero(e.target.value.replace(/\D/g, ''))}
                       placeholder="123"
-                      maxLength={20}
+                      maxLength={10}
                       className="form-control"
                     />
                   </div>

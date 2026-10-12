@@ -6,7 +6,8 @@ const productController = {
   async listar(req, res) {
     try {
       const busca = req.query.busca || req.query.search || '';
-      const apenasAtivos = req.query.apenasAtivos === 'true' || req.query.ativos === 'true';
+      const incluirInativos = req.query.incluirInativos === 'true' || req.query.inativos === 'true';
+      const apenasAtivos = !incluirInativos && req.query.apenasAtivos !== 'false';
 
       const produtos = await ProductModel.listar({ busca, apenasAtivos });
       return res.status(200).json(produtos);

@@ -1,7 +1,7 @@
 const { getPool, sql } = require('../config/db');
 
 class ProductModel {
-  static async listar({ busca = '', apenasAtivos = false } = {}) {
+  static async listar({ busca = '', apenasAtivos = true } = {}) {
     const pool = await getPool();
     const req = pool.request();
 

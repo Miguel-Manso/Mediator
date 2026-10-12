@@ -1,4 +1,4 @@
-function roleMiddleware(perfisPermitidos = ['ADMIN']) {
+function roleMiddleware(perfisPermitidos = ['ADMIN'], mensagemCustomizada = null) {
   return (req, res, next) => {
     const usuario = req.usuario || req.user;
 
@@ -12,8 +12,16 @@ function roleMiddleware(perfisPermitidos = ['ADMIN']) {
     const cargosValidos = perfisPermitidos.map((c) => String(c).toUpperCase());
 
     if (!cargosValidos.includes(cargoFormatado)) {
+      let mensagem = typeof mensagemCustomizada === 'function'
+        ? mensagemCustomizada(cargoFormatado)
+        : mensagemCustomizada;
+
+      if (!mensagem) {
+        mensagem = 'Acesso restrito. Você não tem permissão para acessar este recurso. Contate um administrador.';
+      }
+
       return res.status(403).json({
-        error: 'Acesso restrito. Você não tem permissão para acessar este recurso. Contate um administrador.',
+        error: mensagem,
       });
     }
 

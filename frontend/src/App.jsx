@@ -7,6 +7,7 @@ import { ClientsPage } from './pages/ClientsPage';
 import { EquipmentsPage } from './pages/EquipmentsPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { UsersPage } from './pages/UsersPage';
+import { OrdersPage } from './pages/OrdersPage';
 
 const RotaPrivada = ({ children }) => {
   const { autenticado, isAuthenticated, carregando, loading } = useAuth();
@@ -40,7 +41,7 @@ const RotaAdmin = ({ children }) => {
   }
 
   if (cargo !== 'ADMIN') {
-    return <Navigate to="/clientes" replace />;
+    return <Navigate to="/ordens-servico" replace />;
   }
 
   return children;
@@ -61,7 +62,16 @@ export const App = () => {
               </RotaPrivada>
             }
           >
-            <Route index element={<Navigate to="/clientes" replace />} />
+            <Route index element={<Navigate to="/ordens-servico" replace />} />
+            
+            {/* Ordens de Servico (RF06) */}
+            <Route path="ordens-servico" element={<OrdersPage />} />
+            <Route path="orders" element={<Navigate to="/ordens-servico" replace />} />
+
+            {/* Redirecionamento de status (status fixos sem CRUD) */}
+            <Route path="status-ordem" element={<Navigate to="/ordens-servico" replace />} />
+            <Route path="order-statuses" element={<Navigate to="/ordens-servico" replace />} />
+
             <Route path="clientes" element={<ClientsPage />} />
             <Route path="equipamentos" element={<EquipmentsPage />} />
             <Route path="produtos" element={<ProductsPage />} />

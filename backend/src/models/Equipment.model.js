@@ -6,7 +6,7 @@ class EquipmentModel {
     clienteId = null,
     categoriaId = null,
     marcaId = null,
-    apenasAtivos = false,
+    apenasAtivos = true,
   } = {}) {
     const pool = await getPool();
     const req = pool.request();
@@ -124,17 +124,40 @@ class EquipmentModel {
     categoriaId,
     categoria_id = null,
   }) {
-    const pool = await getPool();
-    const serieFinal = numeroSerie || numero_serie || null;
+    let serieFinal = numeroSerie || numero_serie || null;
     const marcaFinal = marcaId || marca_id || null;
     const modeloFinal = modeloId || modelo_id || null;
     const clienteFinal = clienteId || cliente_id;
     const categoriaFinal = categoriaId || categoria_id;
+    const pool = await getPool();
+
+    if (serieFinal && String(serieFinal).trim() !== '') {
+      serieFinal = String(serieFinal).trim();
+    } else {
+      // Se não preencheu número de série/identificador, gera ID sequencial relativo ao cliente (1, 2, 3...)
+      const resEquips = await pool
+        .request()
+        .input('cid_seq', sql.VarChar, clienteFinal)
+        .query('SELECT numero_serie FROM equipamentos WHERE cliente_id = @cid_seq');
+
+      const numerosExistentes = resEquips.recordset
+        .map((r) => parseInt(r.numero_serie, 10))
+        .filter((n) => !isNaN(n) && n > 0);
+
+      let proximoId = 1;
+      if (numerosExistentes.length > 0) {
+        proximoId = Math.max(...numerosExistentes) + 1;
+      } else {
+        proximoId = resEquips.recordset.length + 1;
+      }
+
+      serieFinal = String(proximoId);
+    }
 
     const result = await pool
       .request()
       .input('descricao', sql.NVarChar, String(descricao).trim())
-      .input('numero_serie', sql.NVarChar, serieFinal ? String(serieFinal).trim() : null)
+      .input('numero_serie', sql.NVarChar, serieFinal)
       .input('marca_id', sql.VarChar, marcaFinal)
       .input('modelo_id', sql.VarChar, modeloFinal)
       .input('cliente_id', sql.VarChar, clienteFinal)

@@ -7,7 +7,9 @@ const clientController = {
   async listar(req, res) {
     try {
       const busca = req.query.busca || req.query.search || '';
-      const clientes = await ClientModel.findAll({ search: busca });
+      const incluirInativos = req.query.incluirInativos === 'true' || req.query.inativos === 'true';
+      const apenasAtivos = !incluirInativos && req.query.apenasAtivos !== 'false';
+      const clientes = await ClientModel.findAll({ search: busca, apenasAtivos });
       return res.status(200).json(clientes);
     } catch (erro) {
       console.error('Erro ao listar clientes:', erro);

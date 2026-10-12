@@ -11,10 +11,11 @@ class AddressModel {
     cep = null,
   }) {
     const pool = await getPool();
+    const numeroLimpo = numero ? String(numero).replace(/\D/g, '').trim() || null : null;
     const result = await pool
       .request()
       .input('logradouro', sql.NVarChar, String(logradouro).trim())
-      .input('numero', sql.NVarChar, numero ? String(numero).trim() : null)
+      .input('numero', sql.NVarChar, numeroLimpo)
       .input('complemento', sql.NVarChar, complemento ? String(complemento).trim() : null)
       .input('bairro', sql.NVarChar, bairro ? String(bairro).trim() : null)
       .input('cidade', sql.NVarChar, cidade ? String(cidade).trim() : 'Viradouro')
@@ -54,8 +55,9 @@ class AddressModel {
       req.input('logradouro', sql.NVarChar, String(dados.logradouro).trim());
     }
     if (dados.numero !== undefined) {
+      const numeroLimpo = dados.numero ? String(dados.numero).replace(/\D/g, '').trim() || null : null;
       query += ', numero = @numero';
-      req.input('numero', sql.NVarChar, dados.numero ? String(dados.numero).trim() : null);
+      req.input('numero', sql.NVarChar, numeroLimpo);
     }
     if (dados.complemento !== undefined) {
       query += ', complemento = @complemento';

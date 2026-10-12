@@ -60,11 +60,33 @@ export const AuthProvider = ({ children }) => {
     setUsuario(null);
   };
 
+  const cargoNormalizado = String(
+    usuario?.cargo ||
+    (usuario?.role === 'ATTENDANT'
+      ? 'ATENDENTE'
+      : usuario?.role === 'TECHNICIAN'
+      ? 'TECNICO'
+      : usuario?.role) ||
+    ''
+  ).toUpperCase();
+
+  const ehAdmin = cargoNormalizado === 'ADMIN';
+  const ehAtendente = cargoNormalizado === 'ATENDENTE' || cargoNormalizado === 'ADMIN';
+  const ehTecnico = cargoNormalizado === 'TECNICO' || cargoNormalizado === 'ADMIN';
+  const apenasTecnico = cargoNormalizado === 'TECNICO';
+  const apenasAtendente = cargoNormalizado === 'ATENDENTE';
+
   return (
     <AuthContext.Provider
       value={{
         usuario,
         user: usuario,
+        cargo: cargoNormalizado,
+        ehAdmin,
+        ehAtendente,
+        ehTecnico,
+        apenasTecnico,
+        apenasAtendente,
         autenticado: !!usuario,
         isAuthenticated: !!usuario,
         carregando,
@@ -83,3 +105,8 @@ export const AuthProvider = ({ children }) => {
 export const useAuth = () => useContext(AuthContext);
 export const useAutenticacao = useAuth;
 export const ProvedorAutenticacao = AuthProvider;
+
+export const usePermissions = () => {
+  const { ehAdmin, ehAtendente, ehTecnico, apenasTecnico, apenasAtendente, cargo } = useAuth();
+  return { ehAdmin, ehAtendente, ehTecnico, apenasTecnico, apenasAtendente, cargo };
+};

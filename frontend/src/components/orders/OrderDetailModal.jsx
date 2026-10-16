@@ -24,9 +24,12 @@ import {
 import { api } from '../../services/api';
 import { maskCurrency } from '../../utils/masks';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSocket } from '../../contexts/SocketContext';
+import { OrderTimeline } from './OrderTimeline';
 
 export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => {
   const { usuario, ehAdmin, ehAtendente, ehTecnico, apenasTecnico, apenasAtendente } = useAuth();
+  const { socket, conectado, inscreverReconexao } = useSocket();
   const [ordem, setOrdem] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
@@ -47,11 +50,6 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
   const [obsStatus, setObsStatus] = useState('');
   const [salvandoStatus, setSalvandoStatus] = useState(false);
 
-  // Estados de Apontamento Técnico
-  const [etapaApontamento, setEtapaApontamento] = useState('Testes de Bancada');
-  const [descApontamento, setDescApontamento] = useState('');
-  const [salvandoApontamento, setSalvandoApontamento] = useState(false);
-
   // Estados de Laudo Técnico
   const [laudoEditavel, setLaudoEditavel] = useState('');
   const [salvandoLaudo, setSalvandoLaudo] = useState(false);
@@ -63,9 +61,6 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
   const [salvandoPeca, setSalvandoPeca] = useState(false);
   const [salvandoBaixa, setSalvandoBaixa] = useState(false);
   const [erroPeca, setErroPeca] = useState('');
-
-  // Filtro de Linha do Tempo: 'TODOS', 'PARECER', 'STATUS'
-  const [filtroHistorico, setFiltroHistorico] = useState('TODOS');
 
   // Carrega detalhes da OS e dados auxiliares
   const carregarDetalhes = async () => {
@@ -96,10 +91,68 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
   };
 
   useEffect(() => {
-    if (aberto && ordemId) {
+    if (!aberto || !ordemId) return;
+
+    carregarDetalhes();
+
+    // Re-fetch silencioso se houver queda e retorno da conexão WebSocket
+    const desinscreverReconexao = inscreverReconexao ? inscreverReconexao(() => {
       carregarDetalhes();
-    }
-  }, [aberto, ordemId]);
+    }) : () => {};
+
+    if (!socket) return desinscreverReconexao;
+
+    // Entra na sala específica da OS para receber eventos em tempo real
+    socket.emit('join_os', ordemId);
+
+    // Chat / Timeline em tempo real: insere o novo apontamento técnico no histórico local
+    const handleNovoApontamento = (payload) => {
+      if (String(payload?.ordemId) === String(ordemId) && payload?.apontamento) {
+        setOrdem((prev) => {
+          if (!prev) return prev;
+          const historicoExistente = prev.historico || [];
+          const novoId = payload.apontamento.id || payload.apontamento._id;
+
+          // Garantia contra duplicação (Idempotência estrita)
+          if (novoId && historicoExistente.some((h) => String(h.id || h._id) === String(novoId))) {
+            return prev;
+          }
+
+          return {
+            ...prev,
+            historico: [payload.apontamento, ...historicoExistente],
+          };
+        });
+      }
+    };
+
+    // Atualização de status e recarregamento caso dados mudem em outra aba/computador
+    const handleStatusAtualizado = (payload) => {
+      if (String(payload?.ordemId || payload?.osId) === String(ordemId)) {
+        carregarDetalhes();
+      }
+    };
+
+    const handleAtualizada = (payload) => {
+      if (String(payload?.ordemId || payload?.osId) === String(ordemId)) {
+        carregarDetalhes();
+      }
+    };
+
+    socket.on('os_novo_apontamento', handleNovoApontamento);
+    socket.on('os_status_atualizado', handleStatusAtualizado);
+    socket.on('os_atualizada', handleAtualizada);
+    socket.on('os_estoque_baixado', handleAtualizada);
+
+    return () => {
+      desinscreverReconexao();
+      socket.emit('leave_os', ordemId);
+      socket.off('os_novo_apontamento', handleNovoApontamento);
+      socket.off('os_status_atualizado', handleStatusAtualizado);
+      socket.off('os_atualizada', handleAtualizada);
+      socket.off('os_estoque_baixado', handleAtualizada);
+    };
+  }, [aberto, ordemId, socket, inscreverReconexao]);
 
   // Atribuir ou Alterar Técnico Responsável
   const aoAtribuirTecnico = async (novoId) => {
@@ -214,27 +267,6 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
     }
   };
 
-  // Salvar Apontamento Técnico Avulso (RF06)
-  const aoAdicionarApontamento = async (e) => {
-    e.preventDefault();
-    if (!descApontamento.trim()) return;
-
-    try {
-      setSalvandoApontamento(true);
-      setErro('');
-      await api.post(`/ordens-servico/${ordemId}/observacoes-tecnicas`, {
-        etapa: etapaApontamento.trim(),
-        descricao: descApontamento.trim(),
-      });
-      setDescApontamento('');
-      await carregarDetalhes();
-      if (aoAtualizar) aoAtualizar();
-    } catch (err) {
-      setErro(err.response?.data?.error || 'Erro ao adicionar apontamento técnico.');
-    } finally {
-      setSalvandoApontamento(false);
-    }
-  };
 
   // Salvar / Atualizar Laudo Técnico
   const aoSalvarLaudo = async () => {
@@ -780,183 +812,18 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
                   </form>
                 </div>
 
-                {/* 2. Novo Apontamento Técnico Avulso (Apenas TECNICO e ADMIN) */}
-                {ehTecnico ? (
-                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3 flex items-center gap-2">
-                      <Wrench className="h-4 w-4 text-emerald-600" />
-                      Registrar Parecer / Evolução Técnica
-                    </h4>
-
-                    <form onSubmit={aoAdicionarApontamento} className="space-y-3">
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">Etapa Atual</label>
-                          <input
-                            type="text"
-                            value={etapaApontamento}
-                            onChange={(e) => setEtapaApontamento(e.target.value)}
-                            placeholder="Ex: Desmontagem, Teste de Carga"
-                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-slate-500 focus:outline-none"
-                          />
-                        </div>
-
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Parecer Técnico / Observações da Etapa *
-                          </label>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              required
-                              placeholder="Descreva testes realizados, medições elétricas ou parecer..."
-                              value={descApontamento}
-                              onChange={(e) => setDescApontamento(e.target.value)}
-                              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-slate-500 focus:outline-none"
-                            />
-                            <button
-                              type="submit"
-                              disabled={salvandoApontamento}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50 shrink-0"
-                            >
-                              {salvandoApontamento ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                              Registrar
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </form>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-xs text-slate-500">
-                    <p className="font-semibold text-slate-700 flex items-center gap-1.5 mb-1">
-                      <ShieldCheck className="h-4 w-4 text-slate-400" />
-                      Evolução de Bancada
-                    </p>
-                    O registro de laudos e apontamentos técnicos é restrito aos técnicos responsáveis. Atendentes podem consultar o histórico cronológico abaixo para atualizar os clientes.
-                  </div>
-                )}
-
-                {/* 3. Linha do Tempo Cronológica com Filtros Específicos (RF05/RF06) */}
-                <div className="rounded-xl border border-slate-200 bg-white p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
-                    <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                        Linha do Tempo de Atendimento e Reparo
-                      </h4>
-                      <p className="text-[11px] text-slate-400">
-                        Acompanhe todas as anotações técnicas e mudanças de etapas da OS.
-                      </p>
-                    </div>
-
-                    {/* Botões de Filtro Rápido */}
-                    <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-lg">
-                      <button
-                        type="button"
-                        onClick={() => setFiltroHistorico('TODOS')}
-                        className={`rounded-md px-2.5 py-1 text-[11px] font-bold transition ${
-                          filtroHistorico === 'TODOS'
-                            ? 'bg-white text-slate-900 shadow-xs'
-                            : 'text-slate-500 hover:text-slate-900'
-                        }`}
-                      >
-                        Todos ({ordem.historico?.length || 0})
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setFiltroHistorico('PARECER')}
-                        className={`rounded-md px-2.5 py-1 text-[11px] font-bold transition ${
-                          filtroHistorico === 'PARECER'
-                            ? 'bg-white text-blue-600 shadow-xs'
-                            : 'text-slate-500 hover:text-blue-600'
-                        }`}
-                      >
-                        Pareceres Técnicos ({ordem.historico?.filter((h) => h.tipoRegistro === 'PARECER').length || 0})
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setFiltroHistorico('STATUS')}
-                        className={`rounded-md px-2.5 py-1 text-[11px] font-bold transition ${
-                          filtroHistorico === 'STATUS'
-                            ? 'bg-white text-indigo-600 shadow-xs'
-                            : 'text-slate-500 hover:text-indigo-600'
-                        }`}
-                      >
-                        Mudanças de Status ({ordem.historico?.filter((h) => h.tipoRegistro === 'STATUS').length || 0})
-                      </button>
-                    </div>
-                  </div>
-
-                  {(() => {
-                    const historicoFiltrado = (ordem.historico || []).filter((h) => {
-                      if (filtroHistorico === 'PARECER') return h.tipoRegistro === 'PARECER';
-                      if (filtroHistorico === 'STATUS') return h.tipoRegistro === 'STATUS';
-                      return true;
-                    });
-
-                    if (historicoFiltrado.length === 0) {
-                      return (
-                        <div className="py-8 text-center text-xs text-slate-400 italic">
-                          {filtroHistorico === 'TODOS'
-                            ? 'Nenhum evento registrado ainda nesta Ordem de Serviço.'
-                            : `Nenhum registro encontrado para o filtro "${
-                                filtroHistorico === 'PARECER' ? 'Pareceres Técnicos' : 'Mudanças de Status'
-                              }".`}
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div className="relative pl-6 space-y-5 before:absolute before:bottom-0 before:left-2 before:top-2 before:w-0.5 before:bg-slate-200">
-                        {historicoFiltrado.map((h) => (
-                          <div key={h.id} className="relative group">
-                            {/* Marcador na linha */}
-                            <div
-                              className="absolute -left-6 top-1 h-2.5 w-2.5 rounded-full border-2 border-white shadow-sm"
-                              style={{ backgroundColor: h.statusCor || (h.tipoRegistro === 'STATUS' ? '#6366F1' : '#0EA5E9') }}
-                            />
-
-                            <div className="rounded-lg border border-slate-100 bg-slate-50/75 p-3 transition hover:bg-white hover:shadow-xs">
-                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-1.5 mb-1.5">
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider ${
-                                      h.tipoRegistro === 'STATUS'
-                                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                                        : 'bg-blue-50 text-blue-700 border border-blue-200'
-                                    }`}
-                                  >
-                                    {h.tipoRegistro === 'STATUS' ? 'Mudança de Status' : 'Parecer Técnico'}
-                                  </span>
-                                  <span className="text-xs font-bold text-slate-800">{h.etapa || 'Apontamento'}</span>
-                                  {h.statusNome && (
-                                    <span
-                                      className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
-                                      style={{ backgroundColor: h.statusCor || '#64748B' }}
-                                    >
-                                      {h.statusNome}
-                                    </span>
-                                  )}
-                                </div>
-                                <span className="text-[11px] text-slate-400">
-                                  {new Date(h.criadoEm).toLocaleString('pt-BR')}
-                                </span>
-                              </div>
-
-                              <p className="text-xs text-slate-700 whitespace-pre-wrap">{h.descricao}</p>
-                              <p className="text-[10px] text-slate-400 mt-1.5">
-                                Por: <span className="font-medium text-slate-600">{h.usuarioNome}</span>{' '}
-                                {h.usuarioCargo ? `(${h.usuarioCargo})` : ''}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                </div>
+                {/* 2. Linha do Tempo e Evolução Técnica (RBAC, Filtros e Timeline Vertical) */}
+                <OrderTimeline
+                  ordemId={ordemId}
+                  historico={ordem.historico || []}
+                  ehTecnico={ehTecnico}
+                  ehAdmin={ehAdmin}
+                  ehAtendente={ehAtendente}
+                  aoRecarregar={async () => {
+                    await carregarDetalhes();
+                    if (aoAtualizar) aoAtualizar();
+                  }}
+                />
               </div>
             )}
 

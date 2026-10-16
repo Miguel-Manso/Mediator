@@ -4,15 +4,45 @@ const roleMiddleware = require('../middlewares/role.middleware');
 
 const router = Router();
 
-// Listagem e busca detalhada dos status estáticos e fixos
+// Listagem e busca detalhada dos status
 router.get('/', orderStatusController.listar);
 router.get('/:id', orderStatusController.obterPorId);
 
-// Status é estático e fixo: mutações bloqueadas
-router.all('*', (req, res) => {
-  return res.status(405).json({
-    error: 'A lista de status de ordem de serviço é fixa no sistema e não permite modificações dinâmicas.',
-  });
-});
+// CRUD de status / colunas de OS
+router.post(
+  '/',
+  roleMiddleware(
+    ['ADMIN', 'ATENDENTE'],
+    'Apenas Administradores e Atendentes possuem permissão para criar novas etapas de status.'
+  ),
+  orderStatusController.criar
+);
+
+router.put(
+  '/:id',
+  roleMiddleware(
+    ['ADMIN', 'ATENDENTE'],
+    'Apenas Administradores e Atendentes possuem permissão para alterar etapas de status.'
+  ),
+  orderStatusController.atualizar
+);
+
+router.patch(
+  '/:id/status',
+  roleMiddleware(
+    ['ADMIN', 'ATENDENTE'],
+    'Apenas Administradores e Atendentes possuem permissão para alternar visibilidade de status.'
+  ),
+  orderStatusController.alternarStatus
+);
+
+router.delete(
+  '/:id',
+  roleMiddleware(
+    ['ADMIN', 'ATENDENTE'],
+    'Apenas Administradores e Atendentes possuem permissão para inativar status.'
+  ),
+  orderStatusController.excluir
+);
 
 module.exports = router;

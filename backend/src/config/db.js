@@ -612,6 +612,8 @@ async function initDatabase() {
           ALTER TABLE ordens_servico ADD observacoes_atendimento NVARCHAR(MAX) NULL;
         IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ordens_servico') AND name = 'ativo')
           ALTER TABLE ordens_servico ADD ativo BIT DEFAULT 1;
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ordens_servico') AND name = 'ordem_kanban')
+          ALTER TABLE ordens_servico ADD ordem_kanban INT DEFAULT 0;
       END
 
       -- 14. Tabela de produtos_ordem (RF06)

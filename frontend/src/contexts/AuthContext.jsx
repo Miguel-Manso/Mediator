@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { conectarSocket, desconectarSocket } from '../services/socket';
 
 const AuthContext = createContext({});
 
@@ -51,9 +52,11 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('@RochaMagazine:usuario', JSON.stringify(usuarioObj));
     localStorage.setItem('@RochaMagazine:user', JSON.stringify(usuarioObj));
     setUsuario(usuarioObj);
+    conectarSocket();
   };
 
   const sair = () => {
+    desconectarSocket();
     localStorage.removeItem('@RochaMagazine:token');
     localStorage.removeItem('@RochaMagazine:usuario');
     localStorage.removeItem('@RochaMagazine:user');

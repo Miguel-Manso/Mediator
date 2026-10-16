@@ -1,5 +1,7 @@
 const { getPool, sql } = require('../config/db');
 const OrderModel = require('../models/Order.model');
+const OrderStatusModel = require('../models/OrderStatus.model');
+const socketService = require('../services/socket.service');
 
 const orderController = {
   // Listagem de OS com filtros e paginação
@@ -184,31 +186,11 @@ const orderController = {
         perguntasTriagem: perguntasTriagem || null,
         descricaoProblema: String(descricaoProblema).trim(),
         observacoesAtendimento: observacoesAtendimento ? String(observacoesAtendimento).trim() : null,
+        usuarioCargo,
       });
 
-      // Auditoria com cargo e usuario_id no detalhes
-      try {
-        await pool
-          .request()
-          .input('usuario_id', sql.VarChar, atendenteId)
-          .input('acao', sql.NVarChar, 'ABERTURA_ORDEM_SERVICO')
-          .input('entidade', sql.NVarChar, 'ordens_servico')
-          .input('entidade_id', sql.NVarChar, novaOrdem.id)
-          .input('detalhes', sql.NVarChar, JSON.stringify({
-            usuario_id: atendenteId,
-            cargo: usuarioCargo,
-            numeroOrdem: novaOrdem.numeroOrdem,
-            clienteId: novaOrdem.clienteId,
-            equipamentoId: novaOrdem.equipamentoId,
-            tipoReparo: novaOrdem.tipoReparo,
-          }))
-          .query(`
-            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
-            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
-          `);
-      } catch (logErr) {
-        console.warn('Falha na auditoria de criação de OS:', logErr.message);
-      }
+      // Emite evento de nova OS criada em tempo real
+      socketService.emitOsCriada(novaOrdem);
 
       return res.status(201).json(novaOrdem);
     } catch (erro) {
@@ -263,30 +245,16 @@ const orderController = {
         dadosParaAtualizar.laudoTecnico = existente.laudoTecnico;
       }
 
-      const ordemAtualizada = await OrderModel.atualizar(id, dadosParaAtualizar);
+      const ordemAtualizada = await OrderModel.atualizar(id, dadosParaAtualizar, {
+        usuarioId,
+        usuarioCargo,
+      });
 
-      // Auditoria com cargo e usuario_id
-      try {
-        const pool = await getPool();
-        await pool
-          .request()
-          .input('usuario_id', sql.VarChar, usuarioId)
-          .input('acao', sql.NVarChar, 'ATUALIZAR_ORDEM_SERVICO')
-          .input('entidade', sql.NVarChar, 'ordens_servico')
-          .input('entidade_id', sql.NVarChar, id)
-          .input('detalhes', sql.NVarChar, JSON.stringify({
-            usuario_id: usuarioId,
-            cargo: usuarioCargo,
-            tecnicoId,
-            laudoTecnico: dadosParaAtualizar.laudoTecnico ? true : false,
-          }))
-          .query(`
-            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
-            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
-          `);
-      } catch (logErr) {
-        console.warn('Falha na auditoria de atualização de OS:', logErr.message);
-      }
+      // Emite evento de atualização genérica da OS
+      socketService.emitOsAtualizada({
+        ordemId: id,
+        ordem: ordemAtualizada,
+      });
 
       return res.status(200).json(ordemAtualizada);
     } catch (erro) {
@@ -299,24 +267,52 @@ const orderController = {
   async atualizarStatus(req, res) {
     try {
       const { id } = req.params;
-      const { statusId, observacao } = req.body || {};
-      const usuarioId = req.usuario?.id || req.user?.id || null;
-      const usuarioCargo = String(req.usuario?.cargo || req.usuario?.role || req.user?.cargo || req.user?.role || '').toUpperCase();
+      const {
+        statusId,
+        novaEtapaId,
+        ordemIndex,
+        historico,
+        observacao,
+      } = req.body || {};
 
-      if (!statusId) {
-        return res.status(400).json({ error: 'O novo statusId é obrigatório.' });
+      // Suporte tanto ao payload { novaEtapaId, ordemIndex, historico } quanto { statusId, observacao }
+      const novoStatusIdentificador = novaEtapaId !== undefined ? novaEtapaId : statusId;
+
+      if (novoStatusIdentificador === undefined || novoStatusIdentificador === null || novoStatusIdentificador === '') {
+        return res.status(400).json({ error: 'O identificador da nova etapa/status (novaEtapaId ou statusId) é obrigatório.' });
       }
 
-      const statusIdNum = Number(statusId);
+      const statusIdNum = Number(novoStatusIdentificador);
+      if (isNaN(statusIdNum)) {
+        return res.status(400).json({ error: 'O identificador da nova etapa/status deve ser numérico.' });
+      }
 
-      // Validação de transição de status por perfil (RBAC)
+      const usuarioId =
+        historico?.usuarioId || req.usuario?.id || req.user?.id || null;
+      const usuarioCargo = String(
+        req.usuario?.cargo || req.usuario?.role || req.user?.cargo || req.user?.role || ''
+      ).toUpperCase();
+
+      const motivo =
+        historico?.motivo || observacao || 'Movimentação via esteira Kanban';
+
+      // 1. Validação de existência da OS
+      const existente = await OrderModel.buscarPorId(id);
+      if (!existente) {
+        return res.status(404).json({ error: 'Ordem de serviço não encontrada.' });
+      }
+
+      // 2. Validação se a etapa de destino existe e está ativa
+      const statusDestino = await OrderStatusModel.buscarPorId(statusIdNum);
+      if (!statusDestino) {
+        return res.status(404).json({ error: 'A etapa/status de destino selecionada não foi localizada no sistema.' });
+      }
+      if (statusDestino.ativo === false || statusDestino.ativo === 0) {
+        return res.status(400).json({ error: `A etapa "${statusDestino.nome}" está inativa e não pode receber Ordens de Serviço.` });
+      }
+
+      // 3. Validação de transição de status por perfil (RBAC)
       if (usuarioCargo === 'TECNICO') {
-        // TECNICO só pode movimentar para status técnicos:
-        // 2: 'Em Análise / Diagnóstico'
-        // 3: 'Aguardando Aprovação'
-        // 5: 'Em Reparo / Em Andamento'
-        // 6: 'Aguardando Peças'
-        // 7: 'Testes Finais / Concluído'
         const statusTecnicosPermitidos = [2, 3, 5, 6, 7];
         if (!statusTecnicosPermitidos.includes(statusIdNum)) {
           return res.status(403).json({
@@ -324,11 +320,6 @@ const orderController = {
           });
         }
       } else if (usuarioCargo === 'ATENDENTE') {
-        // ATENDENTE só pode movimentar para status de atendimento:
-        // 1: 'Aberto / Recebido'
-        // 4: 'Aprovado pelo Cliente'
-        // 8: 'Entregue / Finalizado'
-        // 9: 'Cancelado'
         const statusAtendentesPermitidos = [1, 4, 8, 9];
         if (!statusAtendentesPermitidos.includes(statusIdNum)) {
           return res.status(403).json({
@@ -337,12 +328,7 @@ const orderController = {
         }
       }
 
-      const existente = await OrderModel.buscarPorId(id);
-      if (!existente) {
-        return res.status(404).json({ error: 'Ordem de serviço não encontrada.' });
-      }
-
-      // Trava de integridade de estoque: impede avanço para Testes Finais (7) ou Entregue (8) se houver peças pendentes de baixa
+      // 4. Trava de integridade de estoque: impede avanço para Testes Finais (7) ou Entregue (8) se houver peças pendentes de baixa
       if (statusIdNum === 7 || statusIdNum === 8) {
         const temPecasPendentes = await OrderModel.verificarPecasPendentesBaixa(id);
         if (temPecasPendentes) {
@@ -352,35 +338,35 @@ const orderController = {
         }
       }
 
-      const ordemAtualizada = await OrderModel.atualizarStatus(id, statusIdNum, usuarioId, observacao);
+      // 5. Atualização atômica no banco de dados com histórico, movimentação e auditoria ACID
+      const ordemAtualizada = await OrderModel.atualizarStatus(
+        id,
+        statusIdNum,
+        usuarioId,
+        motivo,
+        ordemIndex !== undefined ? Number(ordemIndex) : null,
+        {
+          usuarioCargo,
+          numeroOrdem: existente.numeroOrdem,
+          statusAnterior: { id: existente.statusId, nome: existente.statusNome },
+          novoStatus: { id: statusDestino.id, nome: statusDestino.nome },
+          origem: 'KANBAN_DRAG_AND_DROP',
+        }
+      );
 
-      // Auditoria com cargo e usuario_id
-      try {
-        const pool = await getPool();
-        await pool
-          .request()
-          .input('usuario_id', sql.VarChar, usuarioId)
-          .input('acao', sql.NVarChar, 'ATUALIZAR_STATUS_OS')
-          .input('entidade', sql.NVarChar, 'ordens_servico')
-          .input('entidade_id', sql.NVarChar, id)
-          .input('detalhes', sql.NVarChar, JSON.stringify({
-            usuario_id: usuarioId,
-            cargo: usuarioCargo,
-            statusAnterior: existente.statusId,
-            novoStatus: statusIdNum,
-            observacao,
-          }))
-          .query(`
-            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
-            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
-          `);
-      } catch (logErr) {
-        console.warn('Falha na auditoria de status da OS:', logErr.message);
-      }
+      // Emite evento de movimentação do Kanban em tempo real
+      socketService.emitOsStatusAtualizado({
+        ordemId: id,
+        novoStatusId: statusIdNum,
+        statusAnteriorId: existente.statusId,
+        ordemIndex: ordemIndex !== undefined && ordemIndex !== null ? Number(ordemIndex) : null,
+        ordem: ordemAtualizada,
+        usuarioId,
+      });
 
       return res.status(200).json(ordemAtualizada);
     } catch (erro) {
-      console.error('Erro ao alterar status da OS:', erro);
+      console.error('Erro ao alterar status da OS via Kanban:', erro);
       return res.status(500).json({ error: erro.message || 'Erro ao atualizar status da ordem de serviço.' });
     }
   },
@@ -408,31 +394,25 @@ const orderController = {
         etapa: String(etapa).trim(),
         descricao: String(descricao).trim(),
         laudoTecnico: laudoTecnico ? String(laudoTecnico).trim() : null,
+        usuarioCargo,
       });
 
-      // Auditoria com cargo e usuario_id
-      try {
-        const pool = await getPool();
-        await pool
-          .request()
-          .input('usuario_id', sql.VarChar, usuarioId)
-          .input('acao', sql.NVarChar, 'PARECER_TECNICO_OS')
-          .input('entidade', sql.NVarChar, 'ordens_servico')
-          .input('entidade_id', sql.NVarChar, id)
-          .input('detalhes', sql.NVarChar, JSON.stringify({
-            usuario_id: usuarioId,
-            cargo: usuarioCargo,
-            ordemId: id,
-            etapa: String(etapa).trim(),
-            laudoTecnico: !!laudoTecnico,
-          }))
-          .query(`
-            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
-            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
-          `);
-      } catch (logErr) {
-        console.warn('Falha na auditoria de parecer técnico:', logErr.message);
-      }
+      // Obtém o apontamento técnico recém-inserido (primeiro item ordenado DESC)
+      const novoApontamento = ordemAtualizada?.historico?.[0] || {
+        ordemId: id,
+        usuarioId,
+        etapa: String(etapa).trim(),
+        descricao: String(descricao).trim(),
+        tipoRegistro: 'PARECER',
+        criadoEm: new Date().toISOString(),
+      };
+
+      // Emite evento de novo parecer para a sala da OS e do Kanban
+      socketService.emitOsNovoApontamento({
+        ordemId: id,
+        apontamento: novoApontamento,
+        ordem: ordemAtualizada,
+      });
 
       return res.status(200).json(ordemAtualizada);
     } catch (erro) {
@@ -469,31 +449,8 @@ const orderController = {
         quantidade: Math.floor(qtd),
         precoUnitario: precoUnitario !== undefined ? Number(precoUnitario) : null,
         usuarioId,
+        usuarioCargo,
       });
-
-      // Auditoria com cargo e usuario_id
-      try {
-        const pool = await getPool();
-        await pool
-          .request()
-          .input('usuario_id', sql.VarChar, usuarioId)
-          .input('acao', sql.NVarChar, 'CONSUMO_PECA_OS')
-          .input('entidade', sql.NVarChar, 'produtos_ordem')
-          .input('entidade_id', sql.NVarChar, id)
-          .input('detalhes', sql.NVarChar, JSON.stringify({
-            usuario_id: usuarioId,
-            cargo: usuarioCargo,
-            produtoId,
-            quantidade: qtd,
-            precoUnitario,
-          }))
-          .query(`
-            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
-            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
-          `);
-      } catch (logErr) {
-        console.warn('Falha na auditoria de consumo de peça:', logErr.message);
-      }
 
       return res.status(201).json(ordemAtualizada);
     } catch (erro) {
@@ -525,30 +482,8 @@ const orderController = {
         ordemId: id,
         itemOrdemId: itemId,
         usuarioId,
+        usuarioCargo,
       });
-
-      // Auditoria com cargo e usuario_id
-      try {
-        const pool = await getPool();
-        await pool
-          .request()
-          .input('usuario_id', sql.VarChar, usuarioId)
-          .input('acao', sql.NVarChar, 'ESTORNO_PECA_OS')
-          .input('entidade', sql.NVarChar, 'produtos_ordem')
-          .input('entidade_id', sql.NVarChar, itemId)
-          .input('detalhes', sql.NVarChar, JSON.stringify({
-            usuario_id: usuarioId,
-            cargo: usuarioCargo,
-            ordemId: id,
-            itemId,
-          }))
-          .query(`
-            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
-            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
-          `);
-      } catch (logErr) {
-        console.warn('Falha na auditoria de estorno de peça:', logErr.message);
-      }
 
       return res.status(200).json(ordemAtualizada);
     } catch (erro) {
@@ -569,30 +504,10 @@ const orderController = {
         return res.status(404).json({ error: 'Ordem de serviço não encontrada.' });
       }
 
-      const atualizado = await OrderModel.alternarStatus(id);
-
-      // Auditoria com cargo e usuario_id
-      try {
-        const pool = await getPool();
-        await pool
-          .request()
-          .input('usuario_id', sql.VarChar, usuarioId)
-          .input('acao', sql.NVarChar, 'ALTERNAR_ATIVO_OS')
-          .input('entidade', sql.NVarChar, 'ordens_servico')
-          .input('entidade_id', sql.NVarChar, id)
-          .input('detalhes', sql.NVarChar, JSON.stringify({
-            usuario_id: usuarioId,
-            cargo: usuarioCargo,
-            ativoAnterior: ordem.ativo,
-            ativoNovo: atualizado.ativo,
-          }))
-          .query(`
-            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
-            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
-          `);
-      } catch (logErr) {
-        console.warn('Falha na auditoria de alternância de OS:', logErr.message);
-      }
+      const atualizado = await OrderModel.alternarStatus(id, {
+        usuarioId,
+        usuarioCargo,
+      });
 
       return res.status(200).json({
         message: `Ordem ${atualizado.numeroOrdem} ${atualizado.ativo ? 'reativada' : 'inativada'} com sucesso.`,
@@ -625,30 +540,15 @@ const orderController = {
       const ordemAtualizada = await OrderModel.baixarEstoque({
         ordemId: id,
         usuarioId,
+        usuarioCargo,
+        numeroOrdem: ordemExistente.numeroOrdem,
       });
 
-      // Auditoria com cargo e usuario_id
-      try {
-        const pool = await getPool();
-        await pool
-          .request()
-          .input('usuario_id', sql.VarChar, usuarioId)
-          .input('acao', sql.NVarChar, 'BAIXA_ESTOQUE_OS')
-          .input('entidade', sql.NVarChar, 'produtos_ordem')
-          .input('entidade_id', sql.NVarChar, id)
-          .input('detalhes', sql.NVarChar, JSON.stringify({
-            usuario_id: usuarioId,
-            cargo: usuarioCargo,
-            ordemId: id,
-            numeroOrdem: ordemExistente.numeroOrdem,
-          }))
-          .query(`
-            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
-            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
-          `);
-      } catch (logErr) {
-        console.warn('Falha na auditoria de baixa de estoque:', logErr.message);
-      }
+      // Emite evento de baixa no estoque em tempo real
+      socketService.emitOsEstoqueBaixado({
+        ordemId: id,
+        ordem: ordemAtualizada,
+      });
 
       return res.status(200).json({
         message: 'Baixa de estoque realizada com sucesso.',
@@ -690,30 +590,15 @@ const orderController = {
         ordemId: id,
         tecnicoId: idTecnicoAlvo || null,
         usuarioId,
+        usuarioCargo,
       });
 
-      // Auditoria com cargo e usuario_id
-      try {
-        const pool = await getPool();
-        await pool
-          .request()
-          .input('usuario_id', sql.VarChar, usuarioId)
-          .input('acao', sql.NVarChar, 'ATRIBUIR_TECNICO_OS')
-          .input('entidade', sql.NVarChar, 'ordens_servico')
-          .input('entidade_id', sql.NVarChar, id)
-          .input('detalhes', sql.NVarChar, JSON.stringify({
-            usuario_id: usuarioId,
-            cargo: usuarioCargo,
-            ordemId: id,
-            tecnicoId: idTecnicoAlvo,
-          }))
-          .query(`
-            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
-            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
-          `);
-      } catch (logErr) {
-        console.warn('Falha na auditoria de atribuição de técnico:', logErr.message);
-      }
+      // Emite evento de atribuição de técnico / atualização de OS em tempo real
+      socketService.emitOsAtualizada({
+        ordemId: id,
+        dados: { tecnicoId: idTecnicoAlvo },
+        ordem: ordemAtualizada,
+      });
 
       return res.status(200).json(ordemAtualizada);
     } catch (erro) {

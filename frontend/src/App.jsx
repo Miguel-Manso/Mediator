@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { SocketProvider } from './contexts/SocketContext';
 import { LoginPage } from './pages/LoginPage';
 import { AppLayout } from './layouts/AppLayout';
 import { ClientsPage } from './pages/ClientsPage';
@@ -50,59 +51,61 @@ const RotaAdmin = ({ children }) => {
 export const App = () => {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
+      <SocketProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
 
-          <Route
-            path="/"
-            element={
-              <RotaPrivada>
-                <AppLayout />
-              </RotaPrivada>
-            }
-          >
-            <Route index element={<Navigate to="/ordens-servico" replace />} />
-            
-            {/* Ordens de Servico (RF06) */}
-            <Route path="ordens-servico" element={<OrdersPage />} />
-            <Route path="orders" element={<Navigate to="/ordens-servico" replace />} />
-
-            {/* Redirecionamento de status (status fixos sem CRUD) */}
-            <Route path="status-ordem" element={<Navigate to="/ordens-servico" replace />} />
-            <Route path="order-statuses" element={<Navigate to="/ordens-servico" replace />} />
-
-            <Route path="clientes" element={<ClientsPage />} />
-            <Route path="equipamentos" element={<EquipmentsPage />} />
-            <Route path="produtos" element={<ProductsPage />} />
-            
-            {/* Rota de Usuarios protegida para perfil ADMIN */}
             <Route
-              path="usuarios"
+              path="/"
               element={
-                <RotaAdmin>
-                  <UsersPage />
-                </RotaAdmin>
+                <RotaPrivada>
+                  <AppLayout />
+                </RotaPrivada>
               }
-            />
+            >
+              <Route index element={<Navigate to="/ordens-servico" replace />} />
+              
+              {/* Ordens de Servico (RF06) */}
+              <Route path="ordens-servico" element={<OrdersPage />} />
+              <Route path="orders" element={<Navigate to="/ordens-servico" replace />} />
 
-            {/* Redirecionamentos para compatibilidade */}
-            <Route path="clients" element={<Navigate to="/clientes" replace />} />
-            <Route path="equipments" element={<Navigate to="/equipamentos" replace />} />
-            <Route path="products" element={<Navigate to="/produtos" replace />} />
-            <Route
-              path="users"
-              element={
-                <RotaAdmin>
-                  <UsersPage />
-                </RotaAdmin>
-              }
-            />
-          </Route>
+              {/* Redirecionamento de status (status fixos sem CRUD) */}
+              <Route path="status-ordem" element={<Navigate to="/ordens-servico" replace />} />
+              <Route path="order-statuses" element={<Navigate to="/ordens-servico" replace />} />
 
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </BrowserRouter>
+              <Route path="clientes" element={<ClientsPage />} />
+              <Route path="equipamentos" element={<EquipmentsPage />} />
+              <Route path="produtos" element={<ProductsPage />} />
+              
+              {/* Rota de Usuarios protegida para perfil ADMIN */}
+              <Route
+                path="usuarios"
+                element={
+                  <RotaAdmin>
+                    <UsersPage />
+                  </RotaAdmin>
+                }
+              />
+
+              {/* Redirecionamentos para compatibilidade */}
+              <Route path="clients" element={<Navigate to="/clientes" replace />} />
+              <Route path="equipments" element={<Navigate to="/equipamentos" replace />} />
+              <Route path="products" element={<Navigate to="/produtos" replace />} />
+              <Route
+                path="users"
+                element={
+                  <RotaAdmin>
+                    <UsersPage />
+                  </RotaAdmin>
+                }
+              />
+            </Route>
+
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </SocketProvider>
     </AuthProvider>
   );
 };

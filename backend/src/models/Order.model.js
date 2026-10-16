@@ -254,7 +254,7 @@ class OrderModel {
         LEFT JOIN usuarios u ON u.id = po.usuario_id
         LEFT JOIN usuarios ub ON ub.id = po.baixado_por
         WHERE po.ordem_id = @ordemId AND po.ativo = 1
-        ORDER BY po.criado_em ASC
+        ORDER BY po.criado_em DESC
       `);
 
     ordem.itens = itensRes.recordset;
@@ -302,6 +302,7 @@ class OrderModel {
     perguntasTriagem = null,
     descricaoProblema,
     observacoesAtendimento = null,
+    usuarioCargo = 'ATENDENTE',
   }) {
     const pool = await getPool();
     const id = (await pool.request().query('SELECT LOWER(NEWID()) AS id')).recordset[0].id;
@@ -375,6 +376,25 @@ class OrderModel {
           VALUES (LOWER(NEWID()), @ordemId, @statusId, @usuarioId, 1, GETDATE())
         `);
 
+      // 4. Auditoria atômica em logs_sistema na mesma transação
+      await new sql.Request(transaction)
+        .input('usuario_id', sql.VarChar, atendenteId)
+        .input('acao', sql.NVarChar, 'ABERTURA_ORDEM_SERVICO')
+        .input('entidade', sql.NVarChar, 'ordens_servico')
+        .input('entidade_id', sql.NVarChar, id)
+        .input('detalhes', sql.NVarChar, JSON.stringify({
+          usuario_id: atendenteId,
+          cargo: usuarioCargo,
+          numeroOrdem,
+          clienteId,
+          equipamentoId,
+          tipoReparo,
+        }))
+        .query(`
+          INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
+          VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
+        `);
+
       await transaction.commit();
       return this.buscarPorId(id);
     } catch (err) {
@@ -383,50 +403,78 @@ class OrderModel {
     }
   }
 
-  // Atualizar dados gerais da OS
-  static async atualizar(id, dados) {
+  // Atualizar dados gerais da OS com transação e auditoria atômica
+  static async atualizar(id, dados, contextoAuditoria = {}) {
     if (!id) return null;
     const pool = await getPool();
-    const req = pool.request().input('id', sql.VarChar, id);
-    const sets = ['atualizado_em = GETDATE()'];
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
 
-    if (dados.tecnicoId !== undefined) {
-      sets.push('tecnico_id = @tecnicoId');
-      req.input('tecnicoId', sql.VarChar, dados.tecnicoId || null);
-    }
-    if (dados.descricaoProblema !== undefined) {
-      sets.push('descricao_problema = @descricaoProblema');
-      req.input('descricaoProblema', sql.NVarChar, dados.descricaoProblema);
-    }
-    if (dados.laudoTecnico !== undefined) {
-      sets.push('laudo_tecnico = @laudoTecnico');
-      req.input('laudoTecnico', sql.NVarChar, dados.laudoTecnico);
-    }
-    if (dados.observacoesAtendimento !== undefined) {
-      sets.push('observacoes_atendimento = @observacoesAtendimento');
-      req.input('observacoesAtendimento', sql.NVarChar, dados.observacoesAtendimento);
-    }
-    if (dados.tipoReparo !== undefined) {
-      sets.push('tipo_reparo = @tipoReparo');
-      req.input('tipoReparo', sql.NVarChar, dados.tipoReparo);
-    }
-    if (dados.perguntasTriagem !== undefined) {
-      sets.push('perguntas_triagem = @perguntasTriagem');
-      const val = typeof dados.perguntasTriagem === 'string' ? dados.perguntasTriagem : JSON.stringify(dados.perguntasTriagem);
-      req.input('perguntasTriagem', sql.NVarChar, val);
-    }
-    if (dados.ativo !== undefined) {
-      sets.push('ativo = @ativo');
-      req.input('ativo', sql.Bit, dados.ativo ? 1 : 0);
-    }
+    try {
+      const sets = ['atualizado_em = GETDATE()'];
+      const updateReq = new sql.Request(transaction).input('id', sql.VarChar, id);
 
-    const query = `
-      UPDATE ordens_servico
-      SET ${sets.join(', ')}
-      WHERE id = @id
-    `;
-    await req.query(query);
-    return this.buscarPorId(id);
+      if (dados.tecnicoId !== undefined) {
+        sets.push('tecnico_id = @tecnicoId');
+        updateReq.input('tecnicoId', sql.VarChar, dados.tecnicoId || null);
+      }
+      if (dados.descricaoProblema !== undefined) {
+        sets.push('descricao_problema = @descricaoProblema');
+        updateReq.input('descricaoProblema', sql.NVarChar, dados.descricaoProblema);
+      }
+      if (dados.laudoTecnico !== undefined) {
+        sets.push('laudo_tecnico = @laudoTecnico');
+        updateReq.input('laudoTecnico', sql.NVarChar, dados.laudoTecnico);
+      }
+      if (dados.observacoesAtendimento !== undefined) {
+        sets.push('observacoes_atendimento = @observacoesAtendimento');
+        updateReq.input('observacoesAtendimento', sql.NVarChar, dados.observacoesAtendimento);
+      }
+      if (dados.tipoReparo !== undefined) {
+        sets.push('tipo_reparo = @tipoReparo');
+        updateReq.input('tipoReparo', sql.NVarChar, dados.tipoReparo);
+      }
+      if (dados.perguntasTriagem !== undefined) {
+        sets.push('perguntas_triagem = @perguntasTriagem');
+        const val = typeof dados.perguntasTriagem === 'string' ? dados.perguntasTriagem : JSON.stringify(dados.perguntasTriagem);
+        updateReq.input('perguntasTriagem', sql.NVarChar, val);
+      }
+      if (dados.ativo !== undefined) {
+        sets.push('ativo = @ativo');
+        updateReq.input('ativo', sql.Bit, dados.ativo ? 1 : 0);
+      }
+
+      await updateReq.query(`
+        UPDATE ordens_servico
+        SET ${sets.join(', ')}
+        WHERE id = @id
+      `);
+
+      // Auditoria em logs_sistema dentro da mesma transação
+      if (contextoAuditoria?.usuarioId) {
+        await new sql.Request(transaction)
+          .input('usuario_id', sql.VarChar, contextoAuditoria.usuarioId)
+          .input('acao', sql.NVarChar, 'ATUALIZAR_ORDEM_SERVICO')
+          .input('entidade', sql.NVarChar, 'ordens_servico')
+          .input('entidade_id', sql.NVarChar, id)
+          .input('detalhes', sql.NVarChar, JSON.stringify({
+            usuario_id: contextoAuditoria.usuarioId,
+            cargo: contextoAuditoria.usuarioCargo || '',
+            tecnicoId: dados.tecnicoId,
+            laudoTecnico: dados.laudoTecnico ? true : false,
+          }))
+          .query(`
+            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
+            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
+          `);
+      }
+
+      await transaction.commit();
+      return this.buscarPorId(id);
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
   }
 
   // Verifica se há peças orçadas ativas que ainda não foram baixadas no estoque
@@ -448,8 +496,8 @@ class OrderModel {
     return Number(res.recordset[0]?.pendentes || 0) > 0;
   }
 
-  // Atualização de Status da OS com registro de histórico e movimentação
-  static async atualizarStatus(id, novoStatusId, usuarioId, observacao = '') {
+  // Atualização de Status da OS com registro de histórico, movimentação e auditoria ACID
+  static async atualizarStatus(id, novoStatusId, usuarioId, observacao = '', ordemIndex = null, dadosAuditoria = {}) {
     const pool = await getPool();
     const transaction = new sql.Transaction(pool);
     await transaction.begin();
@@ -494,12 +542,18 @@ class OrderModel {
         updateQuery += ', fechado_em = NULL';
       }
 
+      const updateReq = new sql.Request(transaction)
+        .input('id', sql.VarChar, id)
+        .input('statusId', sql.Int, statusIdNum);
+
+      if (ordemIndex !== null && ordemIndex !== undefined) {
+        updateQuery += ', ordem_kanban = @ordemIndex';
+        updateReq.input('ordemIndex', sql.Int, Number(ordemIndex) || 0);
+      }
+
       updateQuery += ' WHERE id = @id';
 
-      await new sql.Request(transaction)
-        .input('id', sql.VarChar, id)
-        .input('statusId', sql.Int, statusIdNum)
-        .query(updateQuery);
+      await updateReq.query(updateQuery);
 
       // Nome do status novo para o histórico
       const statusRes = await new sql.Request(transaction)
@@ -507,8 +561,8 @@ class OrderModel {
         .query('SELECT nome FROM status_ordem WHERE id = @statusId');
       const nomeStatus = statusRes.recordset[0]?.nome || `Status ${statusIdNum}`;
 
-      const textoHistorico = observacao && observacao.trim()
-        ? `Status alterado para "${nomeStatus}". Observação: ${observacao.trim()}`
+      const textoHistorico = observacao && String(observacao).trim()
+        ? `Status alterado para "${nomeStatus}". Motivo/Observação: ${String(observacao).trim()}`
         : `Status alterado para "${nomeStatus}".`;
 
       // Inserir no histórico (tipo STATUS)
@@ -533,6 +587,30 @@ class OrderModel {
           VALUES (LOWER(NEWID()), @ordemId, @statusId, @usuarioId, 1, GETDATE())
         `);
 
+      // Inserir auditoria detalhada em logs_sistema na mesma transação ACID
+      const detalhesAuditoria = {
+        usuario_id: usuarioId,
+        cargo: dadosAuditoria.usuarioCargo || '',
+        numeroOrdem: dadosAuditoria.numeroOrdem || '',
+        statusAnterior: dadosAuditoria.statusAnterior || null,
+        novoStatus: dadosAuditoria.novoStatus || { id: statusIdNum, nome: nomeStatus },
+        ordemIndex: ordemIndex !== undefined && ordemIndex !== null ? Number(ordemIndex) : null,
+        motivo: observacao || '',
+        origem: dadosAuditoria.origem || 'KANBAN_DRAG_AND_DROP',
+        timestamp: new Date().toISOString(),
+      };
+
+      await new sql.Request(transaction)
+        .input('usuario_id', sql.VarChar, usuarioId)
+        .input('acao', sql.NVarChar, 'MOVIMENTACAO_KANBAN_STATUS')
+        .input('entidade', sql.NVarChar, 'ordens_servico')
+        .input('entidade_id', sql.NVarChar, id)
+        .input('detalhes', sql.NVarChar, JSON.stringify(detalhesAuditoria))
+        .query(`
+          INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
+          VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
+        `);
+
       await transaction.commit();
       return this.buscarPorId(id);
     } catch (err) {
@@ -542,7 +620,7 @@ class OrderModel {
   }
 
   // Inclusão de observação técnica / parecer da etapa pelo técnico
-  static async adicionarObservacaoTecnica({ ordemId, usuarioId, etapa = 'Parecer Técnico', descricao, laudoTecnico = null }) {
+  static async adicionarObservacaoTecnica({ ordemId, usuarioId, etapa = 'Parecer Técnico', descricao, laudoTecnico = null, usuarioCargo = '' }) {
     const pool = await getPool();
     const transaction = new sql.Transaction(pool);
     await transaction.begin();
@@ -575,6 +653,24 @@ class OrderModel {
           VALUES (LOWER(NEWID()), @ordemId, @usuarioId, 'PARECER', @statusId, @etapa, @descricao, 1, GETDATE())
         `);
 
+      // 4. Auditoria atômica em logs_sistema na mesma transação
+      await new sql.Request(transaction)
+        .input('usuario_id', sql.VarChar, usuarioId)
+        .input('acao', sql.NVarChar, 'PARECER_TECNICO_OS')
+        .input('entidade', sql.NVarChar, 'ordens_servico')
+        .input('entidade_id', sql.NVarChar, ordemId)
+        .input('detalhes', sql.NVarChar, JSON.stringify({
+          usuario_id: usuarioId,
+          cargo: usuarioCargo,
+          ordemId,
+          etapa,
+          laudoTecnico: !!laudoTecnico,
+        }))
+        .query(`
+          INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
+          VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
+        `);
+
       await transaction.commit();
       return this.buscarPorId(ordemId);
     } catch (err) {
@@ -583,8 +679,8 @@ class OrderModel {
     }
   }
 
-  // Lançamento de peça/produto como orçamento (baixado_estoque = 0, sem deduzir estoque)
-  static async adicionarItemProduto({ ordemId, produtoId, quantidade, precoUnitario, usuarioId }) {
+  // Lançamento de peça/produto como orçamento com auditoria atômica
+  static async adicionarItemProduto({ ordemId, produtoId, quantidade, precoUnitario, usuarioId, usuarioCargo = '' }) {
     const pool = await getPool();
     const qtdNum = Number(quantidade) || 1;
     if (qtdNum <= 0) {
@@ -647,6 +743,24 @@ class OrderModel {
           VALUES (LOWER(NEWID()), @ordemId, @usuarioId, 'PARECER', NULL, @etapa, @descricao, 1, GETDATE())
         `);
 
+      // 4. Auditoria atômica em logs_sistema na mesma transação
+      await new sql.Request(transaction)
+        .input('usuario_id', sql.VarChar, usuarioId)
+        .input('acao', sql.NVarChar, 'CONSUMO_PECA_OS')
+        .input('entidade', sql.NVarChar, 'produtos_ordem')
+        .input('entidade_id', sql.NVarChar, ordemId)
+        .input('detalhes', sql.NVarChar, JSON.stringify({
+          usuario_id: usuarioId,
+          cargo: usuarioCargo,
+          produtoId,
+          quantidade: qtdNum,
+          precoUnitario: precoFinal,
+        }))
+        .query(`
+          INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
+          VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
+        `);
+
       await transaction.commit();
       return this.buscarPorId(ordemId);
     } catch (err) {
@@ -655,8 +769,8 @@ class OrderModel {
     }
   }
 
-  // Remoção de peça da OS (se estava baixada, estorna ao estoque; se apenas orçada, apenas desvincula)
-  static async removerItemProduto({ ordemId, itemOrdemId, usuarioId }) {
+  // Remoção de peça da OS com auditoria atômica
+  static async removerItemProduto({ ordemId, itemOrdemId, usuarioId, usuarioCargo = '' }) {
     const pool = await getPool();
     const transaction = new sql.Transaction(pool);
     await transaction.begin();
@@ -713,6 +827,23 @@ class OrderModel {
           VALUES (LOWER(NEWID()), @ordemId, @usuarioId, 'PARECER', NULL, @etapa, @descricao, 1, GETDATE())
         `);
 
+      // 5. Auditoria atômica em logs_sistema na mesma transação
+      await new sql.Request(transaction)
+        .input('usuario_id', sql.VarChar, usuarioId)
+        .input('acao', sql.NVarChar, 'ESTORNO_PECA_OS')
+        .input('entidade', sql.NVarChar, 'produtos_ordem')
+        .input('entidade_id', sql.NVarChar, itemOrdemId)
+        .input('detalhes', sql.NVarChar, JSON.stringify({
+          usuario_id: usuarioId,
+          cargo: usuarioCargo,
+          ordemId,
+          itemId: itemOrdemId,
+        }))
+        .query(`
+          INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
+          VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
+        `);
+
       await transaction.commit();
       return this.buscarPorId(ordemId);
     } catch (err) {
@@ -721,14 +852,14 @@ class OrderModel {
     }
   }
 
-  // Baixa atômica de peças no estoque (RF06 - apenas no status "Em Reparo / Em Andamento")
-  static async baixarEstoque({ ordemId, usuarioId }) {
+  // Baixa atômica de peças no estoque (RF06) com auditoria atômica
+  static async baixarEstoque({ ordemId, usuarioId, usuarioCargo = '', numeroOrdem = '' }) {
     const pool = await getPool();
     const transaction = new sql.Transaction(pool);
     await transaction.begin();
 
     try {
-      // 1. Verifica se a OS existe e está no status 4 ("Em Reparo / Em Andamento")
+      // 1. Verifica se a OS existe e está no status 4 ("Aprovado") ou 5 ("Em Reparo")
       const osRes = await new sql.Request(transaction)
         .input('ordemId', sql.VarChar, ordemId)
         .query('SELECT id, numero_ordem, status_id FROM ordens_servico WHERE id = @ordemId AND ativo = 1');
@@ -817,6 +948,23 @@ class OrderModel {
           VALUES (LOWER(NEWID()), @ordemId, @usuarioId, 'PARECER', @statusId, @etapa, @descricao, 1, GETDATE())
         `);
 
+      // 7. Auditoria atômica em logs_sistema na mesma transação
+      await new sql.Request(transaction)
+        .input('usuario_id', sql.VarChar, usuarioId)
+        .input('acao', sql.NVarChar, 'BAIXA_ESTOQUE_OS')
+        .input('entidade', sql.NVarChar, 'produtos_ordem')
+        .input('entidade_id', sql.NVarChar, ordemId)
+        .input('detalhes', sql.NVarChar, JSON.stringify({
+          usuario_id: usuarioId,
+          cargo: usuarioCargo,
+          ordemId,
+          numeroOrdem: numeroOrdem || os.numero_ordem,
+        }))
+        .query(`
+          INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
+          VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
+        `);
+
       await transaction.commit();
       return this.buscarPorId(ordemId);
     } catch (err) {
@@ -825,8 +973,8 @@ class OrderModel {
     }
   }
 
-  // Atribuir ou alterar técnico responsável da OS
-  static async atribuirTecnico({ ordemId, tecnicoId, usuarioId }) {
+  // Atribuir ou alterar técnico responsável da OS com auditoria atômica
+  static async atribuirTecnico({ ordemId, tecnicoId, usuarioId, usuarioCargo = '' }) {
     const pool = await getPool();
     const transaction = new sql.Transaction(pool);
     await transaction.begin();
@@ -879,6 +1027,23 @@ class OrderModel {
           VALUES (LOWER(NEWID()), @ordemId, @usuarioId, 'PARECER', NULL, @etapa, @descricao, 1, GETDATE())
         `);
 
+      // Auditoria atômica em logs_sistema na mesma transação
+      await new sql.Request(transaction)
+        .input('usuario_id', sql.VarChar, usuarioId)
+        .input('acao', sql.NVarChar, 'ATRIBUIR_TECNICO_OS')
+        .input('entidade', sql.NVarChar, 'ordens_servico')
+        .input('entidade_id', sql.NVarChar, ordemId)
+        .input('detalhes', sql.NVarChar, JSON.stringify({
+          usuario_id: usuarioId,
+          cargo: usuarioCargo,
+          ordemId,
+          tecnicoId,
+        }))
+        .query(`
+          INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
+          VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
+        `);
+
       await transaction.commit();
       return this.buscarPorId(ordemId);
     } catch (err) {
@@ -887,21 +1052,63 @@ class OrderModel {
     }
   }
 
-  // Cancelar ou inativar OS (Soft delete)
-  static async alternarStatus(id) {
+  // Cancelar ou inativar OS (Soft delete) com transação e auditoria atômica
+  static async alternarStatus(id, contextoAuditoria = {}) {
     if (!id) return null;
     const pool = await getPool();
-    const result = await pool
-      .request()
-      .input('id', sql.VarChar, id)
-      .query(`
-        UPDATE ordens_servico
-        SET ativo = CASE WHEN ativo = 1 THEN 0 ELSE 1 END,
-            atualizado_em = GETDATE()
-        WHERE id = @id
-      `);
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
 
-    return this.buscarPorId(id);
+    try {
+      // 1. Obter estado atual da OS
+      const buscaAtual = await new sql.Request(transaction)
+        .input('id', sql.VarChar, id)
+        .query('SELECT id, ativo, numero_ordem FROM ordens_servico WHERE id = @id');
+
+      const osAtual = buscaAtual.recordset[0];
+      if (!osAtual) {
+        await transaction.rollback();
+        return null;
+      }
+
+      const novoAtivo = osAtual.ativo === 1 ? 0 : 1;
+
+      // 2. Atualizar status ativo
+      await new sql.Request(transaction)
+        .input('id', sql.VarChar, id)
+        .input('novoAtivo', sql.Bit, novoAtivo)
+        .query(`
+          UPDATE ordens_servico
+          SET ativo = @novoAtivo,
+              atualizado_em = GETDATE()
+          WHERE id = @id
+        `);
+
+      // 3. Auditoria atômica em logs_sistema na mesma transação
+      if (contextoAuditoria?.usuarioId) {
+        await new sql.Request(transaction)
+          .input('usuario_id', sql.VarChar, contextoAuditoria.usuarioId)
+          .input('acao', sql.NVarChar, 'ALTERNAR_ATIVO_OS')
+          .input('entidade', sql.NVarChar, 'ordens_servico')
+          .input('entidade_id', sql.NVarChar, id)
+          .input('detalhes', sql.NVarChar, JSON.stringify({
+            usuario_id: contextoAuditoria.usuarioId,
+            cargo: contextoAuditoria.usuarioCargo || '',
+            ativoAnterior: osAtual.ativo,
+            ativoNovo: novoAtivo,
+          }))
+          .query(`
+            INSERT INTO logs_sistema (id, usuario_id, acao, entidade, entidade_id, detalhes, ativo)
+            VALUES (LOWER(NEWID()), @usuario_id, @acao, @entidade, @entidade_id, @detalhes, 1)
+          `);
+      }
+
+      await transaction.commit();
+      return this.buscarPorId(id);
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
   }
 }
 

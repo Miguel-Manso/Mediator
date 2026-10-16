@@ -34,8 +34,9 @@ router.patch(
   orderController.alternarStatusOrdem
 );
 
-// Evolução de status e apontamentos técnicos (RF05 & RF06)
+// Evolução de status e apontamentos técnicos (RF05 & RF06 - Drag-and-Drop / Kanban)
 router.patch('/:id/status', orderController.atualizarStatus);
+router.put('/:id/status', orderController.atualizarStatus);
 
 // Registro de laudo técnico ou parecer de bancada: restrito a ADMIN e TECNICO
 router.put(

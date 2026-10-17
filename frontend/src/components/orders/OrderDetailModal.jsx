@@ -20,12 +20,16 @@ import {
   Filter,
   Check,
   Download,
+  Lock,
+  Search,
+  ShieldAlert,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { maskCurrency } from '../../utils/masks';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSocket } from '../../contexts/SocketContext';
 import { OrderTimeline } from './OrderTimeline';
+import { ProductSearchModal } from '../common/ProductSearchModal';
 
 export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => {
   const { usuario, ehAdmin, ehAtendente, ehTecnico, apenasTecnico, apenasAtendente } = useAuth();
@@ -35,6 +39,12 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
   const [erro, setErro] = useState('');
   const [sucessoMsg, setSucessoMsg] = useState('');
   const [abaAtiva, setAbaAtiva] = useState('triagem'); // 'triagem', 'evolucao', 'pecas'
+
+  // Bloqueio de Concorrência Pessimista (Socket.io)
+  const [bloqueioConcorrencia, setBloqueioConcorrencia] = useState(null);
+
+  // Modal de Pesquisa Avançada de Peças/Produtos
+  const [modalPesquisaPecaAberto, setModalPesquisaPecaAberto] = useState(false);
 
   // Dados auxiliares para selects
   const [todosStatus, setTodosStatus] = useState([]);
@@ -91,8 +101,12 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
   };
 
   useEffect(() => {
-    if (!aberto || !ordemId) return;
+    if (!aberto || !ordemId) {
+      setBloqueioConcorrencia(null);
+      return;
+    }
 
+    setBloqueioConcorrencia(null);
     carregarDetalhes();
 
     // Re-fetch silencioso se houver queda e retorno da conexão WebSocket
@@ -102,8 +116,40 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
 
     if (!socket) return desinscreverReconexao;
 
-    // Entra na sala específica da OS para receber eventos em tempo real
-    socket.emit('join_os', ordemId);
+    // Entra na sala específica da OS para receber eventos e adquirir lock
+    socket.emit('join_os', ordemId, (resposta) => {
+      if (resposta?.bloqueado) {
+        setBloqueioConcorrencia({
+          bloqueadoPor: resposta.bloqueadoPor || 'Outro usuário',
+          bloqueadoEm: resposta.bloqueadoEm || new Date().toISOString(),
+        });
+      }
+    });
+
+    // Eventos de Lock Pessimista de Concorrência
+    const handleLockBlocked = (payload) => {
+      if (String(payload?.ordemId) === String(ordemId)) {
+        setBloqueioConcorrencia({
+          bloqueadoPor: payload.bloqueadoPor || 'Outro usuário',
+          bloqueadoEm: payload.bloqueadoEm || new Date().toISOString(),
+        });
+      }
+    };
+
+    const handleLockAcquired = (payload) => {
+      if (String(payload?.ordemId) === String(ordemId)) {
+        setBloqueioConcorrencia(null);
+      }
+    };
+
+    const handleLockReleased = (payload) => {
+      if (String(payload?.ordemId) === String(ordemId)) {
+        setBloqueioConcorrencia(null);
+        if (aberto && socket) {
+          socket.emit('join_os', ordemId);
+        }
+      }
+    };
 
     // Chat / Timeline em tempo real: insere o novo apontamento técnico no histórico local
     const handleNovoApontamento = (payload) => {
@@ -139,6 +185,9 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
       }
     };
 
+    socket.on('os_locked', handleLockBlocked);
+    socket.on('os_lock_acquired', handleLockAcquired);
+    socket.on('os_lock_released', handleLockReleased);
     socket.on('os_novo_apontamento', handleNovoApontamento);
     socket.on('os_status_atualizado', handleStatusAtualizado);
     socket.on('os_atualizada', handleAtualizada);
@@ -147,6 +196,9 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
     return () => {
       desinscreverReconexao();
       socket.emit('leave_os', ordemId);
+      socket.off('os_locked', handleLockBlocked);
+      socket.off('os_lock_acquired', handleLockAcquired);
+      socket.off('os_lock_released', handleLockReleased);
       socket.off('os_novo_apontamento', handleNovoApontamento);
       socket.off('os_status_atualizado', handleStatusAtualizado);
       socket.off('os_atualizada', handleAtualizada);
@@ -297,7 +349,13 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
 
     const qtd = Number(qtdPeca);
     if (isNaN(qtd) || qtd <= 0) {
-      setErroPeca('A quantidade deve ser maior que zero.');
+      setErroPeca('A quantidade deve ser estritamente maior que zero (> 0).');
+      return;
+    }
+
+    const precoNum = precoPeca ? parseFloat(String(precoPeca).replace(',', '.')) : 0;
+    if (isNaN(precoNum) || precoNum <= 0) {
+      setErroPeca('O valor/preço da peça deve ser estritamente maior que zero (R$ > 0).');
       return;
     }
 
@@ -306,7 +364,7 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
       await api.post(`/ordens-servico/${ordemId}/produtos`, {
         produtoId: produtoSelecionadoId,
         quantidade: qtd,
-        precoUnitario: precoPeca ? parseFloat(String(precoPeca).replace(',', '.')) : undefined,
+        precoUnitario: precoNum,
       });
 
       setProdutoSelecionadoId('');
@@ -473,7 +531,50 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
           </div>
         )}
 
-        {carregando ? (
+        {bloqueioConcorrencia ? (
+          <div className="flex flex-col items-center justify-center p-8 sm:p-12 text-center my-auto space-y-4">
+            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 shadow-sm animate-pulse">
+              <Lock className="h-10 w-10" />
+            </div>
+
+            <div className="max-w-md space-y-2">
+              <h3 className="text-lg font-bold text-slate-900">
+                Acesso Simultâneo Bloqueado
+              </h3>
+              <p className="text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                Esta Ordem de Serviço já está sendo visualizada/editada por{' '}
+                <span className="font-extrabold text-amber-950 underline">
+                  {bloqueioConcorrencia.bloqueadoPor}
+                </span>
+                . Aguarde ele fechar a sessão.
+              </p>
+              <p className="text-xs text-slate-500">
+                Para prevenir conflitos de versão e perda acidental de dados, apenas um operador pode manter a OS aberta para visualização ou edição por vez. O bloqueio será liberado automaticamente assim que o usuário fechar o modal ou se desconectar.
+              </p>
+            </div>
+
+            <div className="pt-4 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={aoFechar}
+                className="rounded-lg bg-slate-900 px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-slate-800 transition"
+              >
+                Voltar para a Lista
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (socket && ordemId) {
+                    socket.emit('join_os', ordemId);
+                  }
+                }}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition"
+              >
+                Tentar Novamente
+              </button>
+            </div>
+          </div>
+        ) : carregando ? (
           <div className="flex h-72 items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
           </div>
@@ -847,7 +948,17 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
 
                     <form onSubmit={aoAdicionarPeca} className="grid grid-cols-1 gap-3 sm:grid-cols-12 items-end">
                       <div className="sm:col-span-5">
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">Produto / Peça *</label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-semibold text-slate-700">Produto / Peça *</label>
+                          <button
+                            type="button"
+                            onClick={() => setModalPesquisaPecaAberto(true)}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition"
+                          >
+                            <Search className="h-3 w-3" />
+                            Pesquisa Avançada
+                          </button>
+                        </div>
                         <select
                           value={produtoSelecionadoId}
                           onChange={(e) => aoMudarProduto(e.target.value)}
@@ -1062,6 +1173,16 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
           </button>
         </div>
       </div>
+
+      {/* Modal de Pesquisa Avançada de Produtos / Peças */}
+      <ProductSearchModal
+        aberto={modalPesquisaPecaAberto}
+        aoFechar={() => setModalPesquisaPecaAberto(false)}
+        aoSelecionar={(p) => {
+          aoMudarProduto(p.id);
+          setModalPesquisaPecaAberto(false);
+        }}
+      />
     </div>
   );
 };

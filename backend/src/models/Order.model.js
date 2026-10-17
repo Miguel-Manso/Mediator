@@ -712,6 +712,10 @@ class OrderModel {
         ? Number(precoUnitario) 
         : Number(produto.preco);
 
+      if (isNaN(precoFinal) || precoFinal <= 0) {
+        throw new Error('O valor unitário da peça deve ser estritamente maior que zero (R$ > 0).');
+      }
+
       // 2. Inserir em produtos_ordem com baixado_estoque = 0 (apenas orçamento preliminar)
       const itemIdRes = await new sql.Request(transaction).query('SELECT LOWER(NEWID()) AS id');
       const itemId = itemIdRes.recordset[0].id;

@@ -28,6 +28,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { verificarPermissaoDrop } from '../utils/orderPermissions';
 import { OrderCreateModal } from '../components/orders/OrderCreateModal';
 import { OrderDetailModal } from '../components/orders/OrderDetailModal';
+import { Pagination } from '../components/common/Pagination';
 import { OrderKanban } from '../components/orders/OrderKanban';
 import { OrderColumnModal } from '../components/orders/OrderColumnModal';
 import { OrderInactivateColumnModal } from '../components/orders/OrderInactivateColumnModal';
@@ -234,12 +235,19 @@ export const OrdersPage = () => {
   }, [busca, statusFiltro, tecnicoFiltro, exibirInativas, pagina, modoVisualizacao]);
 
   // Estrutura dinâmica das colunas do Kanban conforme o requisito:
-  // { id, title, color, order, isActive, cards: [...] }
+  // Se um status específico for selecionado no dropdown "Todos os status", oculte todas as outras colunas
+  // e exiba APENAS a coluna correspondente àquele status na tela, expandindo-a para aproveitar o espaço.
   const colunasKanban = useMemo(() => {
-    const colunasFiltradas = statusLista.filter((s) => {
+    let colunasFiltradas = statusLista.filter((s) => {
       if (exibirColunasInativas) return true;
       return s.ativo !== false && s.ativo !== 0;
     });
+
+    if (statusFiltro && String(statusFiltro).trim() !== '') {
+      colunasFiltradas = colunasFiltradas.filter((s) => String(s.id) === String(statusFiltro));
+    }
+
+    const ehUnicaColuna = colunasFiltradas.length === 1 && Boolean(statusFiltro);
 
     return colunasFiltradas.map((st) => ({
       id: st.id,
@@ -248,9 +256,10 @@ export const OrdersPage = () => {
       order: st.ordem ?? 0,
       isActive: st.ativo !== false && st.ativo !== 0,
       descricao: st.descricao,
+      isExpandida: ehUnicaColuna,
       cards: ordens.filter((o) => Number(o.statusId) === Number(st.id)),
     }));
-  }, [statusLista, ordens, exibirColunasInativas]);
+  }, [statusLista, ordens, exibirColunasInativas, statusFiltro]);
 
   // Alternar ativo/inativo da OS (Soft delete)
   const alternarAtivoOrdem = async (id, statusAtual) => {
@@ -822,37 +831,14 @@ export const OrdersPage = () => {
             </div>
           )}
 
-          {/* Paginação da Tabela */}
-          {totalPaginas > 1 && (
-            <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 bg-slate-50/50 text-xs text-slate-600">
-              <span>
-                Página <strong className="text-slate-800">{pagina}</strong> de{' '}
-                <strong className="text-slate-800">{totalPaginas}</strong> ({totalOrdens} ordens)
-              </span>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={pagina <= 1}
-                  onClick={() => setPagina((p) => Math.max(1, p - 1))}
-                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-3 py-1 font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                  Anterior
-                </button>
-
-                <button
-                  type="button"
-                  disabled={pagina >= totalPaginas}
-                  onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-3 py-1 font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
-                >
-                  Próxima
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Paginação Clássica Numerada da Tabela */}
+          <Pagination
+            paginaAtual={pagina}
+            totalPaginas={totalPaginas}
+            totalRegistros={totalOrdens}
+            limite={20}
+            aoMudarPagina={(novaPagina) => setPagina(novaPagina)}
+          />
         </div>
       )}
 

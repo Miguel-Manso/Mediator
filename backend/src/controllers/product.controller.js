@@ -2,15 +2,26 @@ const { getPool, sql } = require('../config/db');
 const ProductModel = require('../models/Product.model');
 
 const productController = {
-  // Listagem de produtos/peças com filtro por busca e status
+  // Listagem de produtos/peças com filtro por busca, status, ordenação e paginação
   async listar(req, res) {
     try {
       const busca = req.query.busca || req.query.search || '';
       const incluirInativos = req.query.incluirInativos === 'true' || req.query.inativos === 'true';
       const apenasAtivos = !incluirInativos && req.query.apenasAtivos !== 'false';
+      const orderBy = req.query.orderBy || req.query.ordenarPor || 'nome';
+      const orderDirection = req.query.orderDirection || req.query.ordem || 'ASC';
+      const pagina = req.query.pagina ? Number(req.query.pagina) : null;
+      const limite = req.query.limite ? Number(req.query.limite) : null;
 
-      const produtos = await ProductModel.listar({ busca, apenasAtivos });
-      return res.status(200).json(produtos);
+      const resultado = await ProductModel.listar({
+        busca,
+        apenasAtivos,
+        orderBy,
+        orderDirection,
+        pagina,
+        limite,
+      });
+      return res.status(200).json(resultado);
     } catch (erro) {
       console.error('Erro ao listar produtos:', erro);
       return res.status(500).json({ error: erro.message || 'Erro ao listar produtos.' });
@@ -45,8 +56,8 @@ const productController = {
       }
 
       const precoNumerico = Number(preco);
-      if (isNaN(precoNumerico) || precoNumerico < 0) {
-        return res.status(400).json({ error: 'O preço deve ser um valor numérico maior ou igual a zero.' });
+      if (isNaN(precoNumerico) || precoNumerico <= 0) {
+        return res.status(400).json({ error: 'O preço deve ser um valor numérico maior que zero (R$ > 0).' });
       }
 
       const estoqueNumerico = Number(estoque);
@@ -122,8 +133,8 @@ const productController = {
 
       if (preco !== undefined) {
         const precoNum = Number(preco);
-        if (isNaN(precoNum) || precoNum < 0) {
-          return res.status(400).json({ error: 'O preço deve ser maior ou igual a zero.' });
+        if (isNaN(precoNum) || precoNum <= 0) {
+          return res.status(400).json({ error: 'O preço deve ser maior que zero (R$ > 0).' });
         }
         dadosAtualizacao.preco = precoNum;
       }

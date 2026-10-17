@@ -94,6 +94,13 @@ export const OrderKanbanCard = ({
   };
 
   const handleDragEnd = (e) => {
+    if (e?.dataTransfer) {
+      try {
+        e.dataTransfer.clearData();
+      } catch (err) {
+        // Ignora restrições do navegador ao manipular dataTransfer no evento dragend
+      }
+    }
     if (onDragEndCard) {
       onDragEndCard();
     }
@@ -101,10 +108,12 @@ export const OrderKanbanCard = ({
 
   const valorPecas = os.totalProdutos ? Number(os.totalProdutos) : 0;
 
-  // Se este card está sendo arrastado atualmente, exibe o placeholder sutil com borda tracejada
+  // Se este card está sendo arrastado atualmente, exibe o placeholder sutil preservando o draggable e onDragEnd
   if (estaArrastando) {
     return (
       <div
+        draggable={true}
+        onDragEnd={handleDragEnd}
         className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-100/70 p-4 transition-all duration-150 min-h-[140px] flex flex-col items-center justify-center text-center select-none"
       >
         <span className="font-mono text-xs font-bold text-slate-400 bg-slate-200/80 px-2.5 py-1 rounded-md">

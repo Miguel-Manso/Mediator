@@ -3,14 +3,26 @@ const ClientModel = require('../models/Client.model');
 const AddressModel = require('../models/Address.model');
 
 const clientController = {
-  // Listagem com filtro opcional via Model
+  // Listagem com filtro opcional via Model, ordenação e paginação
   async listar(req, res) {
     try {
       const busca = req.query.busca || req.query.search || '';
       const incluirInativos = req.query.incluirInativos === 'true' || req.query.inativos === 'true';
       const apenasAtivos = !incluirInativos && req.query.apenasAtivos !== 'false';
-      const clientes = await ClientModel.findAll({ search: busca, apenasAtivos });
-      return res.status(200).json(clientes);
+      const orderBy = req.query.orderBy || req.query.ordenarPor || 'nome';
+      const orderDirection = req.query.orderDirection || req.query.ordem || 'ASC';
+      const pagina = req.query.pagina ? Number(req.query.pagina) : null;
+      const limite = req.query.limite ? Number(req.query.limite) : null;
+
+      const resultado = await ClientModel.findAll({
+        search: busca,
+        apenasAtivos,
+        orderBy,
+        orderDirection,
+        pagina,
+        limite,
+      });
+      return res.status(200).json(resultado);
     } catch (erro) {
       console.error('Erro ao listar clientes:', erro);
       return res.status(500).json({ error: erro.message || 'Erro ao listar clientes.' });

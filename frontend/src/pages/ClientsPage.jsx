@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Phone, MapPin, Loader2, Edit, UserX } from 'lucide-react';
+import { Search, Plus, Phone, MapPin, Loader2, Edit, UserX, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { api } from '../services/api';
 import { maskCPF, maskPhone, maskCEP } from '../utils/masks';
 import { useAuth } from '../contexts/AuthContext';
+import { Pagination } from '../components/common/Pagination';
 
 export const ClientsPage = () => {
   const { ehAdmin, ehAtendente, apenasTecnico } = useAuth();
@@ -36,15 +37,56 @@ export const ClientsPage = () => {
   const [salvando, setSalvando] = useState(false);
   const [erroFormulario, setErroFormulario] = useState('');
 
+  // Estados de Paginação e Ordenação
+  const [pagina, setPagina] = useState(1);
+  const [limite] = useState(10);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [totalClientes, setTotalClientes] = useState(0);
+  const [orderBy, setOrderBy] = useState('nome');
+  const [orderDirection, setOrderDirection] = useState('ASC');
+
+  const alternarOrdenacao = (campo) => {
+    if (orderBy === campo) {
+      setOrderDirection((prev) => (prev === 'ASC' ? 'DESC' : 'ASC'));
+    } else {
+      setOrderBy(campo);
+      setOrderDirection('ASC');
+    }
+    setPagina(1);
+  };
+
+  const renderIconeOrdenacao = (campo) => {
+    if (orderBy !== campo) {
+      return <ArrowUpDown className="h-3 w-3 text-slate-400 group-hover:text-slate-600 transition" />;
+    }
+    return orderDirection === 'ASC' ? (
+      <ArrowUp className="h-3 w-3 text-slate-900" />
+    ) : (
+      <ArrowDown className="h-3 w-3 text-slate-900" />
+    );
+  };
+
   const buscarClientes = async () => {
     try {
       setCarregando(true);
       const params = new URLSearchParams();
       if (busca) params.append('busca', busca);
       if (exibirInativos) params.append('incluirInativos', 'true');
-      const qs = params.toString() ? `?${params.toString()}` : '';
-      const resposta = await api.get(`/clientes${qs}`);
-      setClientes(resposta.data);
+      params.append('orderBy', orderBy);
+      params.append('orderDirection', orderDirection);
+      params.append('pagina', String(pagina));
+      params.append('limite', String(limite));
+
+      const resposta = await api.get(`/clientes?${params.toString()}`);
+      if (resposta.data && typeof resposta.data === 'object' && 'dados' in resposta.data) {
+        setClientes(resposta.data.dados || []);
+        setTotalPaginas(resposta.data.totalPaginas || 1);
+        setTotalClientes(resposta.data.total || 0);
+      } else {
+        setClientes(Array.isArray(resposta.data) ? resposta.data : []);
+        setTotalPaginas(1);
+        setTotalClientes(Array.isArray(resposta.data) ? resposta.data.length : 0);
+      }
     } catch (erro) {
       console.error('Erro ao carregar clientes:', erro);
     } finally {
@@ -54,7 +96,7 @@ export const ClientsPage = () => {
 
   useEffect(() => {
     buscarClientes();
-  }, [busca, exibirInativos]);
+  }, [busca, exibirInativos, pagina, orderBy, orderDirection]);
 
   const abrirModalCriacao = () => {
     setErroFormulario('');
@@ -222,10 +264,42 @@ export const ClientsPage = () => {
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                 <tr>
-                  <th className="px-6 py-4">Nome / CPF</th>
-                  <th className="px-6 py-4">Contato</th>
-                  <th className="px-6 py-4">Endereço / Localização</th>
-                  <th className="px-6 py-4">Status</th>
+                  <th
+                    onClick={() => alternarOrdenacao('nome')}
+                    className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/75 transition group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Nome / CPF</span>
+                      {renderIconeOrdenacao('nome')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => alternarOrdenacao('telefone')}
+                    className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/75 transition group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Contato</span>
+                      {renderIconeOrdenacao('telefone')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => alternarOrdenacao('cidade')}
+                    className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/75 transition group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Endereço / Localização</span>
+                      {renderIconeOrdenacao('cidade')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => alternarOrdenacao('status')}
+                    className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/75 transition group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Status</span>
+                      {renderIconeOrdenacao('status')}
+                    </div>
+                  </th>
                   <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
               </thead>
@@ -307,6 +381,13 @@ export const ClientsPage = () => {
                 })}
               </tbody>
             </table>
+            <Pagination
+              paginaAtual={pagina}
+              totalPaginas={totalPaginas}
+              totalRegistros={totalClientes}
+              limite={limite}
+              aoMudarPagina={(novaPagina) => setPagina(novaPagina)}
+            />
           </div>
         )}
       </div>

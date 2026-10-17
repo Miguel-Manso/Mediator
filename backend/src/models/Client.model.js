@@ -1,9 +1,114 @@
 const { getPool, sql } = require('../config/db');
 
 class ClientModel {
-  static async findAll({ search = '', apenasAtivos = true } = {}) {
+  static async findAll({
+    search = '',
+    apenasAtivos = true,
+    orderBy = 'nome',
+    orderDirection = 'ASC',
+    pagina = null,
+    limite = null,
+  } = {}) {
     const pool = await getPool();
     const req = pool.request();
+
+    let whereClause = 'WHERE 1=1';
+
+    if (apenasAtivos) {
+      whereClause += ' AND c.ativo = 1';
+    }
+
+    if (search && String(search).trim() !== '') {
+      req.input('termoBusca', sql.NVarChar, `%${String(search).trim()}%`);
+      whereClause += `
+        AND (
+          c.nome LIKE @termoBusca 
+          OR c.cpf LIKE @termoBusca 
+          OR c.telefone LIKE @termoBusca
+          OR c.email LIKE @termoBusca
+          OR e.cidade LIKE @termoBusca
+          OR e.logradouro LIKE @termoBusca
+          OR e.bairro LIKE @termoBusca
+        )
+      `;
+    }
+
+    const mapCamposOrdenacao = {
+      nome: 'c.nome',
+      cpf: 'c.cpf',
+      email: 'c.email',
+      telefone: 'c.telefone',
+      cidade: "COALESCE(e.cidade, 'Viradouro')",
+      status: 'c.status',
+      criadoEm: 'c.criado_em',
+      criado_em: 'c.criado_em',
+      atualizadoEm: 'c.atualizado_em',
+      atualizado_em: 'c.atualizado_em',
+    };
+
+    const campoOrdenacao = mapCamposOrdenacao[orderBy] || 'c.nome';
+    const direcaoOrdenacao = String(orderDirection).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+
+    // Se paginação for solicitada
+    if (pagina !== null && limite !== null && Number(pagina) > 0 && Number(limite) > 0) {
+      const countQuery = `
+        SELECT COUNT(1) AS total
+        FROM clientes c
+        LEFT JOIN enderecos e ON c.endereco_id = e.id
+        ${whereClause}
+      `;
+      const countRes = await req.query(countQuery);
+      const total = countRes.recordset[0]?.total || 0;
+
+      const offset = Math.max(0, (Number(pagina) - 1) * Number(limite));
+      req.input('offset', sql.Int, offset);
+      req.input('limite', sql.Int, Number(limite));
+
+      const query = `
+        SELECT 
+          c.id, 
+          c.nome, 
+          c.cpf, 
+          c.email, 
+          c.telefone, 
+          COALESCE(e.cidade, 'Viradouro') AS cidade, 
+          COALESCE(e.logradouro, '') AS endereco, 
+          c.endereco_id AS enderecoId,
+          c.status, 
+          c.ativo,
+          c.observacoes, 
+          c.criado_em AS criadoEm, 
+          c.atualizado_em AS atualizadoEm,
+          c.nome AS name,
+          c.telefone AS phone,
+          COALESCE(e.cidade, 'Viradouro') AS city,
+          COALESCE(e.logradouro, '') AS address,
+          c.observacoes AS notes,
+          c.criado_em AS createdAt,
+          c.atualizado_em AS updatedAt,
+          e.logradouro,
+          e.numero,
+          e.complemento,
+          e.bairro,
+          COALESCE(e.cidade, 'Viradouro') AS enderecoCidade,
+          e.cep,
+          e.uf
+        FROM clientes c
+        LEFT JOIN enderecos e ON c.endereco_id = e.id
+        ${whereClause}
+        ORDER BY ${campoOrdenacao} ${direcaoOrdenacao}
+        OFFSET @offset ROWS FETCH NEXT @limite ROWS ONLY
+      `;
+
+      const result = await req.query(query);
+      return {
+        dados: result.recordset,
+        total,
+        pagina: Number(pagina),
+        limite: Number(limite),
+        totalPaginas: Math.ceil(total / Number(limite)) || 1,
+      };
+    }
 
     let query = `
       SELECT 
@@ -36,32 +141,16 @@ class ClientModel {
         e.uf
       FROM clientes c
       LEFT JOIN enderecos e ON c.endereco_id = e.id
-      WHERE 1=1
+      ${whereClause}
+      ORDER BY ${campoOrdenacao} ${direcaoOrdenacao}
     `;
-
-    if (apenasAtivos) {
-      query += ' AND c.ativo = 1';
-    }
-
-    if (search && String(search).trim() !== '') {
-      req.input('termoBusca', sql.NVarChar, `%${String(search).trim()}%`);
-      query += `
-        AND (
-          c.nome LIKE @termoBusca 
-          OR c.cpf LIKE @termoBusca 
-          OR c.telefone LIKE @termoBusca
-          OR c.email LIKE @termoBusca
-          OR e.cidade LIKE @termoBusca
-          OR e.logradouro LIKE @termoBusca
-          OR e.bairro LIKE @termoBusca
-        )
-      `;
-    }
-
-    query += ' ORDER BY c.nome ASC';
 
     const result = await req.query(query);
     return result.recordset;
+  }
+
+  static async listar(params) {
+    return this.findAll(params);
   }
 
   static async findById(id) {

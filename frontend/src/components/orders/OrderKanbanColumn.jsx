@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Plus,
   MoreVertical,
@@ -36,6 +36,28 @@ export const OrderKanbanColumn = ({
   const [estaSobre, setEstaSobre] = useState(false);
   const [estaSobreProibido, setEstaSobreProibido] = useState(false);
   const [indiceInsercao, setIndiceInsercao] = useState(null);
+
+  // Limpeza de segurança (Ghost State): se o arrasto global foi encerrado (ex: solto no vazio),
+  // reseta os estados visuais de hover e inserção da coluna para não congelar a UI.
+  useEffect(() => {
+    const resetLocal = () => {
+      setEstaSobre(false);
+      setEstaSobreProibido(false);
+      setIndiceInsercao(null);
+    };
+
+    if (!cardSendoArrastado) {
+      resetLocal();
+    }
+
+    window.addEventListener('dragend', resetLocal);
+    window.addEventListener('mouseup', resetLocal);
+
+    return () => {
+      window.removeEventListener('dragend', resetLocal);
+      window.removeEventListener('mouseup', resetLocal);
+    };
+  }, [cardSendoArrastado]);
 
   const cards = coluna.cards || [];
   const totalCards = cards.length;
@@ -90,7 +112,7 @@ export const OrderKanbanColumn = ({
   };
 
   const handleDragLeave = (e) => {
-    if (!e.currentTarget.contains(e.relatedTarget)) {
+    if (!e.relatedTarget || !e.currentTarget.contains(e.relatedTarget)) {
       setEstaSobre(false);
       setEstaSobreProibido(false);
       setIndiceInsercao(null);
@@ -105,12 +127,17 @@ export const OrderKanbanColumn = ({
     const destinoIndex = indiceInsercao !== null ? indiceInsercao : cards.length;
     setIndiceInsercao(null);
 
-    // Se não for permitido, bloqueia a execução do drop
-    if (!permitido) {
-      return;
+    try {
+      // Se não for permitido, bloqueia a execução do drop
+      if (permitido) {
+        onDropCard(e, coluna.id, destinoIndex);
+      }
+    } finally {
+      // Garante limpeza visual imediata ao final da execução do drop
+      setEstaSobre(false);
+      setEstaSobreProibido(false);
+      setIndiceInsercao(null);
     }
-
-    onDropCard(e, coluna.id, destinoIndex);
   };
 
   return (
@@ -118,7 +145,9 @@ export const OrderKanbanColumn = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`flex flex-col w-80 shrink-0 rounded-2xl border transition-all duration-200 max-h-[calc(100vh-230px)] select-none ${
+      className={`flex flex-col ${
+        coluna.isExpandida ? 'w-full flex-1 min-w-[320px]' : 'w-80 shrink-0'
+      } rounded-2xl border transition-all duration-200 max-h-[calc(100vh-230px)] select-none ${
         estaSobreProibido
           ? 'border-rose-400 ring-2 ring-rose-300/60 bg-rose-50/50 shadow-md cursor-not-allowed scale-[1.008]'
           : estaSobre
@@ -268,7 +297,13 @@ export const OrderKanbanColumn = ({
       </div>
 
       {/* ÁREA DE CONTEÚDO DA COLUNA COM SCROLL VERTICAL INDEPENDENTE E DROP ZONES */}
-      <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5 min-h-[140px]">
+      <div
+        className={`flex-1 overflow-y-auto p-2.5 min-h-[140px] ${
+          coluna.isExpandida
+            ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 content-start'
+            : 'space-y-2.5'
+        }`}
+      >
         {totalCards === 0 ? (
           estaSobreProibido ? (
             /* Indicador de Drop Proibido em Coluna Vazia */

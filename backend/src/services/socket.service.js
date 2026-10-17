@@ -8,6 +8,9 @@ const SOCKET_EVENTS = {
   EMIT_OS_ATUALIZADA: 'os_atualizada',
   EMIT_OS_NOVO_APONTAMENTO: 'os_novo_apontamento',
   EMIT_OS_ESTOQUE_BAIXADO: 'os_estoque_baixado',
+  EMIT_OS_LOCKED: 'os_locked',
+  EMIT_OS_LOCK_ACQUIRED: 'os_lock_acquired',
+  EMIT_OS_LOCK_RELEASED: 'os_lock_released',
 };
 
 // Constantes das Salas (Rooms)
@@ -17,6 +20,13 @@ const ROOMS = {
 };
 
 let io = null;
+
+// Mapa de Bloqueios Pessimistas de Ordem de Serviço em memória:
+// key: string (ordemId) -> value: { socketId: string, usuarioId: string, nomeUsuario: string, timestamp: string }
+const osLocks = new Map();
+// Mapeamento inverso para limpeza instantânea na desconexão:
+// key: string (socketId) -> Set<string (ordemId)>
+const socketToLocks = new Map();
 
 /**
  * Inicializa a instância do Socket.io atrelada ao servidor HTTP nativo.
@@ -84,25 +94,102 @@ function initSocket(httpServer) {
       console.log(`[Socket.io] Socket ${socket.id} saiu da sala ${ROOMS.KANBAN}`);
     });
 
-    // Entrada na sala específica de uma OS (ao abrir o modal de detalhes)
-    socket.on('join_os', (ordemId) => {
-      if (ordemId) {
-        const salaOS = ROOMS.OS(ordemId);
-        socket.join(salaOS);
-        console.log(`[Socket.io] Socket ${socket.id} entrou na sala ${salaOS}`);
+    // Entrada na sala específica de uma OS com Lock Pessimista de concorrência
+    socket.on('join_os', (ordemId, callback) => {
+      if (!ordemId) return;
+      const ordemIdStr = String(ordemId);
+      const currentUserId = socket.usuario?.id || socket.usuario?.sub || socket.usuario?.userId;
+      const currentUserName = socket.usuario?.nome || socket.usuario?.name || 'Outro usuário';
+
+      const existingLock = osLocks.get(ordemIdStr);
+
+      // Se já houver um lock ativo por outro usuário e outro socket
+      if (existingLock && existingLock.socketId !== socket.id && existingLock.usuarioId !== currentUserId) {
+        console.warn(`[Socket.io Lock] OS ${ordemIdStr} já bloqueada por ${existingLock.nomeUsuario}. Acesso negado para ${currentUserName}`);
+        
+        socket.emit(SOCKET_EVENTS.EMIT_OS_LOCKED, {
+          ordemId: ordemIdStr,
+          bloqueadoPor: existingLock.nomeUsuario,
+          bloqueadoEm: existingLock.timestamp,
+        });
+
+        if (typeof callback === 'function') {
+          callback({
+            sucesso: false,
+            bloqueado: true,
+            bloqueadoPor: existingLock.nomeUsuario,
+            bloqueadoEm: existingLock.timestamp,
+          });
+        }
+        return;
+      }
+
+      // Concede o Lock para este usuário / socket
+      osLocks.set(ordemIdStr, {
+        socketId: socket.id,
+        usuarioId: currentUserId,
+        nomeUsuario: currentUserName,
+        timestamp: new Date().toISOString(),
+      });
+
+      if (!socketToLocks.has(socket.id)) {
+        socketToLocks.set(socket.id, new Set());
+      }
+      socketToLocks.get(socket.id).add(ordemIdStr);
+
+      const salaOS = ROOMS.OS(ordemIdStr);
+      socket.join(salaOS);
+      console.log(`[Socket.io Lock] Lock concedido na OS ${ordemIdStr} para ${currentUserName} (${socket.id})`);
+
+      socket.emit(SOCKET_EVENTS.EMIT_OS_LOCK_ACQUIRED, {
+        ordemId: ordemIdStr,
+        usuarioId: currentUserId,
+        nomeUsuario: currentUserName,
+      });
+
+      if (typeof callback === 'function') {
+        callback({
+          sucesso: true,
+          bloqueado: false,
+        });
       }
     });
 
-    // Saída da sala da OS (ao fechar o modal)
-    socket.on('leave_os', (ordemId) => {
-      if (ordemId) {
-        const salaOS = ROOMS.OS(ordemId);
-        socket.leave(salaOS);
-        console.log(`[Socket.io] Socket ${socket.id} saiu da sala ${salaOS}`);
+    // Saída da sala da OS (ao fechar o modal) com liberação do Lock
+    socket.on('leave_os', (ordemId, callback) => {
+      if (!ordemId) return;
+      const ordemIdStr = String(ordemId);
+      const salaOS = ROOMS.OS(ordemIdStr);
+      socket.leave(salaOS);
+
+      const lock = osLocks.get(ordemIdStr);
+      if (lock && lock.socketId === socket.id) {
+        osLocks.delete(ordemIdStr);
+        if (socketToLocks.has(socket.id)) {
+          socketToLocks.get(socket.id).delete(ordemIdStr);
+        }
+        console.log(`[Socket.io Lock] Lock liberado na OS ${ordemIdStr} por fechamento de modal.`);
+        io.emit(SOCKET_EVENTS.EMIT_OS_LOCK_RELEASED, { ordemId: ordemIdStr });
+      }
+
+      if (typeof callback === 'function') {
+        callback({ sucesso: true });
       }
     });
 
     socket.on('disconnect', (motivo) => {
+      const userLocks = socketToLocks.get(socket.id);
+      if (userLocks && userLocks.size > 0) {
+        userLocks.forEach((ordemIdStr) => {
+          const lock = osLocks.get(ordemIdStr);
+          if (lock && lock.socketId === socket.id) {
+            osLocks.delete(ordemIdStr);
+            console.log(`[Socket.io Lock] Lock liberado na OS ${ordemIdStr} por desconexão do socket.`);
+            io.emit(SOCKET_EVENTS.EMIT_OS_LOCK_RELEASED, { ordemId: ordemIdStr });
+          }
+        });
+        socketToLocks.delete(socket.id);
+      }
       console.log(`[Socket.io] Cliente desconectado: ${socket.id} (Motivo: ${motivo})`);
     });
   });
@@ -265,11 +352,16 @@ function emitOsEstoqueBaixado({ ordemId, itens, ordem }) {
   }
 }
 
+function getOsLock(ordemId) {
+  return osLocks.get(String(ordemId)) || null;
+}
+
 module.exports = {
   SOCKET_EVENTS,
   ROOMS,
   initSocket,
   getIO,
+  getOsLock,
   emitOsCriada,
   emitOsStatusAtualizado,
   emitOsAtualizada,

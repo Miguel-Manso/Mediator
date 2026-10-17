@@ -10,10 +10,14 @@ import {
   AlertTriangle,
   Coins,
   Boxes,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { maskCurrency } from '../utils/masks';
 import { useAuth } from '../contexts/AuthContext';
+import { Pagination } from '../components/common/Pagination';
 
 export const ProductsPage = () => {
   const { ehAdmin } = useAuth();
@@ -37,15 +41,56 @@ export const ProductsPage = () => {
   const [salvando, setSalvando] = useState(false);
   const [erroFormulario, setErroFormulario] = useState('');
 
+  // Estados de Paginação e Ordenação
+  const [pagina, setPagina] = useState(1);
+  const [limite] = useState(10);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [totalProdutos, setTotalProdutos] = useState(0);
+  const [orderBy, setOrderBy] = useState('nome');
+  const [orderDirection, setOrderDirection] = useState('ASC');
+
+  const alternarOrdenacao = (campo) => {
+    if (orderBy === campo) {
+      setOrderDirection((prev) => (prev === 'ASC' ? 'DESC' : 'ASC'));
+    } else {
+      setOrderBy(campo);
+      setOrderDirection('ASC');
+    }
+    setPagina(1);
+  };
+
+  const renderIconeOrdenacao = (campo) => {
+    if (orderBy !== campo) {
+      return <ArrowUpDown className="h-3 w-3 text-slate-400 group-hover:text-slate-600 transition" />;
+    }
+    return orderDirection === 'ASC' ? (
+      <ArrowUp className="h-3 w-3 text-slate-900" />
+    ) : (
+      <ArrowDown className="h-3 w-3 text-slate-900" />
+    );
+  };
+
   const buscarProdutos = async () => {
     try {
       setCarregando(true);
       const params = new URLSearchParams();
       if (busca) params.append('busca', busca);
       if (exibirInativos) params.append('incluirInativos', 'true');
-      const qs = params.toString() ? `?${params.toString()}` : '';
-      const resposta = await api.get(`/produtos${qs}`);
-      setProdutos(resposta.data);
+      params.append('orderBy', orderBy);
+      params.append('orderDirection', orderDirection);
+      params.append('pagina', String(pagina));
+      params.append('limite', String(limite));
+
+      const resposta = await api.get(`/produtos?${params.toString()}`);
+      if (resposta.data && typeof resposta.data === 'object' && 'dados' in resposta.data) {
+        setProdutos(resposta.data.dados || []);
+        setTotalPaginas(resposta.data.totalPaginas || 1);
+        setTotalProdutos(resposta.data.total || 0);
+      } else {
+        setProdutos(Array.isArray(resposta.data) ? resposta.data : []);
+        setTotalPaginas(1);
+        setTotalProdutos(Array.isArray(resposta.data) ? resposta.data.length : 0);
+      }
     } catch (erro) {
       console.error('Erro ao carregar produtos:', erro);
     } finally {
@@ -55,7 +100,7 @@ export const ProductsPage = () => {
 
   useEffect(() => {
     buscarProdutos();
-  }, [busca, exibirInativos]);
+  }, [busca, exibirInativos, pagina, orderBy, orderDirection]);
 
   const abrirModalCriacao = () => {
     setErroFormulario('');
@@ -91,8 +136,8 @@ export const ProductsPage = () => {
     }
 
     const precoNum = parseFloat(String(preco).replace(',', '.'));
-    if (isNaN(precoNum) || precoNum < 0) {
-      setErroFormulario('Informe um preço válido maior ou igual a zero.');
+    if (isNaN(precoNum) || precoNum <= 0) {
+      setErroFormulario('O preço do produto ou peça deve ser estritamente maior que zero (R$ > 0).');
       return;
     }
 
@@ -206,10 +251,42 @@ export const ProductsPage = () => {
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                 <tr>
-                  <th className="px-6 py-4">Peça / Produto</th>
-                  <th className="px-6 py-4">Preço Unitário</th>
-                  <th className="px-6 py-4">Estoque Atual</th>
-                  <th className="px-6 py-4">Status</th>
+                  <th
+                    onClick={() => alternarOrdenacao('nome')}
+                    className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/75 transition group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Peça / Produto</span>
+                      {renderIconeOrdenacao('nome')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => alternarOrdenacao('preco')}
+                    className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/75 transition group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Preço Unitário</span>
+                      {renderIconeOrdenacao('preco')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => alternarOrdenacao('estoque')}
+                    className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/75 transition group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Estoque Atual</span>
+                      {renderIconeOrdenacao('estoque')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => alternarOrdenacao('ativo')}
+                    className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/75 transition group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Status</span>
+                      {renderIconeOrdenacao('ativo')}
+                    </div>
+                  </th>
                   <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
               </thead>
@@ -293,6 +370,13 @@ export const ProductsPage = () => {
                 })}
               </tbody>
             </table>
+            <Pagination
+              paginaAtual={pagina}
+              totalPaginas={totalPaginas}
+              totalRegistros={totalProdutos}
+              limite={limite}
+              aoMudarPagina={(novaPagina) => setPagina(novaPagina)}
+            />
           </div>
         )}
       </div>

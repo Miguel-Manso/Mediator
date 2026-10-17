@@ -12,10 +12,14 @@ import {
   Hash,
   X,
   Sliders,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { EquipmentParametersModal } from '../components/equipments/EquipmentParametersModal';
+import { Pagination } from '../components/common/Pagination';
 
 export const EquipmentsPage = () => {
   const { ehAdmin, ehAtendente, apenasTecnico } = useAuth();
@@ -48,6 +52,37 @@ export const EquipmentsPage = () => {
   const [salvando, setSalvando] = useState(false);
   const [erroFormulario, setErroFormulario] = useState('');
 
+  // Novos Filtros, Ordenação e Paginação
+  const [categoriaFiltro, setCategoriaFiltro] = useState('');
+  const [marcaFiltro, setMarcaFiltro] = useState('');
+  const [pagina, setPagina] = useState(1);
+  const [limite] = useState(10);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [totalEquipamentos, setTotalEquipamentos] = useState(0);
+  const [orderBy, setOrderBy] = useState('criadoEm');
+  const [orderDirection, setOrderDirection] = useState('DESC');
+
+  const alternarOrdenacao = (campo) => {
+    if (orderBy === campo) {
+      setOrderDirection((prev) => (prev === 'ASC' ? 'DESC' : 'ASC'));
+    } else {
+      setOrderBy(campo);
+      setOrderDirection('ASC');
+    }
+    setPagina(1);
+  };
+
+  const renderIconeOrdenacao = (campo) => {
+    if (orderBy !== campo) {
+      return <ArrowUpDown className="h-3 w-3 text-slate-400 group-hover:text-slate-600 transition" />;
+    }
+    return orderDirection === 'ASC' ? (
+      <ArrowUp className="h-3 w-3 text-slate-900" />
+    ) : (
+      <ArrowDown className="h-3 w-3 text-slate-900" />
+    );
+  };
+
   // Carregar dados de equipamentos
   const buscarEquipamentos = async () => {
     try {
@@ -55,9 +90,23 @@ export const EquipmentsPage = () => {
       const params = new URLSearchParams();
       if (busca) params.append('busca', busca);
       if (exibirInativos) params.append('incluirInativos', 'true');
-      const qs = params.toString() ? `?${params.toString()}` : '';
-      const resposta = await api.get(`/equipamentos${qs}`);
-      setEquipamentos(resposta.data);
+      if (categoriaFiltro) params.append('categoriaId', categoriaFiltro);
+      if (marcaFiltro) params.append('marcaId', marcaFiltro);
+      params.append('orderBy', orderBy);
+      params.append('orderDirection', orderDirection);
+      params.append('pagina', String(pagina));
+      params.append('limite', String(limite));
+
+      const resposta = await api.get(`/equipamentos?${params.toString()}`);
+      if (resposta.data && typeof resposta.data === 'object' && 'dados' in resposta.data) {
+        setEquipamentos(resposta.data.dados || []);
+        setTotalPaginas(resposta.data.totalPaginas || 1);
+        setTotalEquipamentos(resposta.data.total || 0);
+      } else {
+        setEquipamentos(Array.isArray(resposta.data) ? resposta.data : []);
+        setTotalPaginas(1);
+        setTotalEquipamentos(Array.isArray(resposta.data) ? resposta.data.length : 0);
+      }
     } catch (erro) {
       console.error('Erro ao carregar equipamentos:', erro);
     } finally {
@@ -85,7 +134,7 @@ export const EquipmentsPage = () => {
 
   useEffect(() => {
     buscarEquipamentos();
-  }, [busca, exibirInativos]);
+  }, [busca, exibirInativos, categoriaFiltro, marcaFiltro, pagina, orderBy, orderDirection]);
 
   const abrirModalCriacao = () => {
     setErroFormulario('');
@@ -209,24 +258,69 @@ export const EquipmentsPage = () => {
         </div>
       </div>
 
-      {/* Barra de Busca e Filtros */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+      {/* Barra de Busca e Filtros Avançados */}
+      <div className="flex flex-col lg:flex-row lg:items-center gap-3">
         <div className="relative flex-1">
           <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={busca}
-            onChange={(e) => setBusca(e.target.value)}
+            onChange={(e) => {
+              setBusca(e.target.value);
+              setPagina(1);
+            }}
             placeholder="Buscar por descrição, número de série, cliente, marca ou modelo..."
             className="search-control"
             maxLength={150}
           />
         </div>
+
+        {/* Filtro por Categoria */}
+        <div className="w-full lg:w-48">
+          <select
+            value={categoriaFiltro}
+            onChange={(e) => {
+              setCategoriaFiltro(e.target.value);
+              setPagina(1);
+            }}
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-xs focus:border-slate-400 focus:outline-none transition"
+          >
+            <option value="">Todas as Categorias</option>
+            {categorias.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.nome}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Filtro por Marca */}
+        <div className="w-full lg:w-48">
+          <select
+            value={marcaFiltro}
+            onChange={(e) => {
+              setMarcaFiltro(e.target.value);
+              setPagina(1);
+            }}
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-xs focus:border-slate-400 focus:outline-none transition"
+          >
+            <option value="">Todas as Marcas</option>
+            {marcas.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.nome}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-600 bg-white border border-slate-200 px-3.5 py-2.5 rounded-xl shadow-xs hover:bg-slate-50 transition shrink-0">
           <input
             type="checkbox"
             checked={exibirInativos}
-            onChange={(e) => setExibirInativos(e.target.checked)}
+            onChange={(e) => {
+              setExibirInativos(e.target.checked);
+              setPagina(1);
+            }}
             className="rounded border-slate-300 text-slate-900 focus:ring-slate-400 h-4 w-4"
           />
           <span>Exibir inativos</span>
@@ -251,11 +345,51 @@ export const EquipmentsPage = () => {
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                 <tr>
-                  <th className="px-6 py-4">Equipamento / Série</th>
-                  <th className="px-6 py-4">Cliente Proprietário</th>
-                  <th className="px-6 py-4">Categoria</th>
-                  <th className="px-6 py-4">Marca / Modelo</th>
-                  <th className="px-6 py-4">Status</th>
+                  <th
+                    onClick={() => alternarOrdenacao('descricao')}
+                    className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/75 transition group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Equipamento / Série</span>
+                      {renderIconeOrdenacao('descricao')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => alternarOrdenacao('clienteNome')}
+                    className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/75 transition group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Cliente Proprietário</span>
+                      {renderIconeOrdenacao('clienteNome')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => alternarOrdenacao('categoriaNome')}
+                    className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/75 transition group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Categoria</span>
+                      {renderIconeOrdenacao('categoriaNome')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => alternarOrdenacao('marcaNome')}
+                    className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/75 transition group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Marca / Modelo</span>
+                      {renderIconeOrdenacao('marcaNome')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => alternarOrdenacao('ativo')}
+                    className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/75 transition group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Status</span>
+                      {renderIconeOrdenacao('ativo')}
+                    </div>
+                  </th>
                   <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
               </thead>
@@ -328,6 +462,13 @@ export const EquipmentsPage = () => {
                 })}
               </tbody>
             </table>
+            <Pagination
+              paginaAtual={pagina}
+              totalPaginas={totalPaginas}
+              totalRegistros={totalEquipamentos}
+              limite={limite}
+              aoMudarPagina={(novaPagina) => setPagina(novaPagina)}
+            />
           </div>
         )}
       </div>

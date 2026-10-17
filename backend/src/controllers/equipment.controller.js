@@ -5,7 +5,7 @@ const ModelModel = require('../models/Model.model');
 const CategoryModel = require('../models/Category.model');
 
 const equipmentController = {
-  // Listagem com busca e filtros
+  // Listagem com busca, filtros, ordenação e paginação
   async listar(req, res) {
     try {
       const busca = req.query.busca || req.query.search || '';
@@ -14,16 +14,24 @@ const equipmentController = {
       const marcaId = req.query.marcaId || req.query.marca_id || null;
       const incluirInativos = req.query.incluirInativos === 'true' || req.query.inativos === 'true';
       const apenasAtivos = !incluirInativos && req.query.apenasAtivos !== 'false';
+      const orderBy = req.query.orderBy || req.query.ordenarPor || 'criadoEm';
+      const orderDirection = req.query.orderDirection || req.query.ordem || 'DESC';
+      const pagina = req.query.pagina ? Number(req.query.pagina) : null;
+      const limite = req.query.limite ? Number(req.query.limite) : null;
 
-      const equipamentos = await EquipmentModel.listar({
+      const resultado = await EquipmentModel.listar({
         busca,
         clienteId,
         categoriaId,
         marcaId,
         apenasAtivos,
+        orderBy,
+        orderDirection,
+        pagina,
+        limite,
       });
 
-      return res.status(200).json(equipamentos);
+      return res.status(200).json(resultado);
     } catch (erro) {
       console.error('Erro ao listar equipamentos:', erro);
       return res.status(500).json({ error: erro.message || 'Erro ao listar equipamentos.' });

@@ -438,6 +438,13 @@ const orderController = {
         return res.status(400).json({ error: 'A quantidade deve ser um número maior que zero.' });
       }
 
+      if (precoUnitario !== undefined && precoUnitario !== null && String(precoUnitario).trim() !== '') {
+        const precoNum = Number(precoUnitario);
+        if (isNaN(precoNum) || precoNum <= 0) {
+          return res.status(400).json({ error: 'O valor unitário da peça deve ser estritamente maior que zero (R$ > 0).' });
+        }
+      }
+
       const ordemExistente = await OrderModel.buscarPorId(id);
       if (!ordemExistente) {
         return res.status(404).json({ error: 'Ordem de serviço não encontrada.' });
@@ -447,7 +454,7 @@ const orderController = {
         ordemId: id,
         produtoId,
         quantidade: Math.floor(qtd),
-        precoUnitario: precoUnitario !== undefined ? Number(precoUnitario) : null,
+        precoUnitario: precoUnitario !== undefined && precoUnitario !== null && String(precoUnitario).trim() !== '' ? Number(precoUnitario) : null,
         usuarioId,
         usuarioCargo,
       });

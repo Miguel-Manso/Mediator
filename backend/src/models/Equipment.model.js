@@ -7,11 +7,123 @@ class EquipmentModel {
     categoriaId = null,
     marcaId = null,
     apenasAtivos = true,
+    orderBy = 'criadoEm',
+    orderDirection = 'DESC',
+    pagina = null,
+    limite = null,
   } = {}) {
     const pool = await getPool();
     const req = pool.request();
 
-    let query = `
+    let whereClause = 'WHERE 1=1';
+
+    if (busca && String(busca).trim() !== '') {
+      req.input('termoBusca', sql.NVarChar, `%${String(busca).trim()}%`);
+      whereClause += `
+        AND (
+          e.descricao LIKE @termoBusca 
+          OR e.numero_serie LIKE @termoBusca 
+          OR c.nome LIKE @termoBusca 
+          OR m.nome LIKE @termoBusca 
+          OR mo.nome LIKE @termoBusca 
+          OR cat.nome LIKE @termoBusca
+        )
+      `;
+    }
+
+    if (clienteId) {
+      req.input('clienteId', sql.VarChar, clienteId);
+      whereClause += ' AND e.cliente_id = @clienteId';
+    }
+
+    if (categoriaId) {
+      req.input('categoriaId', sql.Int, Number(categoriaId));
+      whereClause += ' AND e.categoria_id = @categoriaId';
+    }
+
+    if (marcaId) {
+      req.input('marcaId', sql.VarChar, marcaId);
+      whereClause += ' AND e.marca_id = @marcaId';
+    }
+
+    if (apenasAtivos) {
+      whereClause += ' AND e.ativo = 1';
+    }
+
+    const mapCamposOrdenacao = {
+      descricao: 'e.descricao',
+      numeroSerie: 'e.numero_serie',
+      numero_serie: 'e.numero_serie',
+      clienteNome: 'c.nome',
+      categoriaNome: 'cat.nome',
+      marcaNome: 'm.nome',
+      modeloNome: 'mo.nome',
+      criadoEm: 'e.criado_em',
+      criado_em: 'e.criado_em',
+      atualizadoEm: 'e.atualizado_em',
+      ativo: 'e.ativo',
+    };
+
+    const campoOrdenacao = mapCamposOrdenacao[orderBy] || 'e.criado_em';
+    const direcaoOrdenacao = String(orderDirection).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    // Se paginação for solicitada
+    if (pagina !== null && limite !== null && Number(pagina) > 0 && Number(limite) > 0) {
+      const countQuery = `
+        SELECT COUNT(1) AS total
+        FROM equipamentos e
+        LEFT JOIN marcas m ON e.marca_id = m.id
+        LEFT JOIN modelos mo ON e.modelo_id = mo.id
+        LEFT JOIN clientes c ON e.cliente_id = c.id
+        LEFT JOIN categorias_equipamento cat ON e.categoria_id = cat.id
+        ${whereClause}
+      `;
+      const countRes = await req.query(countQuery);
+      const total = countRes.recordset[0]?.total || 0;
+
+      const offset = Math.max(0, (Number(pagina) - 1) * Number(limite));
+      req.input('offset', sql.Int, offset);
+      req.input('limite', sql.Int, Number(limite));
+
+      const query = `
+        SELECT 
+          e.id, 
+          e.descricao, 
+          e.numero_serie AS numeroSerie, 
+          e.marca_id AS marcaId, 
+          e.modelo_id AS modeloId, 
+          e.cliente_id AS clienteId, 
+          e.categoria_id AS categoriaId, 
+          e.ativo, 
+          e.criado_em AS criadoEm, 
+          e.atualizado_em AS atualizadoEm,
+          m.nome AS marcaNome,
+          mo.nome AS modeloNome,
+          c.nome AS clienteNome,
+          c.telefone AS clienteTelefone,
+          c.cpf AS clienteCpf,
+          cat.nome AS categoriaNome
+        FROM equipamentos e
+        LEFT JOIN marcas m ON e.marca_id = m.id
+        LEFT JOIN modelos mo ON e.modelo_id = mo.id
+        LEFT JOIN clientes c ON e.cliente_id = c.id
+        LEFT JOIN categorias_equipamento cat ON e.categoria_id = cat.id
+        ${whereClause}
+        ORDER BY ${campoOrdenacao} ${direcaoOrdenacao}
+        OFFSET @offset ROWS FETCH NEXT @limite ROWS ONLY
+      `;
+
+      const result = await req.query(query);
+      return {
+        dados: result.recordset,
+        total,
+        pagina: Number(pagina),
+        limite: Number(limite),
+        totalPaginas: Math.ceil(total / Number(limite)) || 1,
+      };
+    }
+
+    const query = `
       SELECT 
         e.id, 
         e.descricao, 
@@ -34,43 +146,9 @@ class EquipmentModel {
       LEFT JOIN modelos mo ON e.modelo_id = mo.id
       LEFT JOIN clientes c ON e.cliente_id = c.id
       LEFT JOIN categorias_equipamento cat ON e.categoria_id = cat.id
-      WHERE 1=1
+      ${whereClause}
+      ORDER BY ${campoOrdenacao} ${direcaoOrdenacao}
     `;
-
-    if (busca && String(busca).trim() !== '') {
-      req.input('termoBusca', sql.NVarChar, `%${String(busca).trim()}%`);
-      query += `
-        AND (
-          e.descricao LIKE @termoBusca 
-          OR e.numero_serie LIKE @termoBusca 
-          OR c.nome LIKE @termoBusca 
-          OR m.nome LIKE @termoBusca 
-          OR mo.nome LIKE @termoBusca 
-          OR cat.nome LIKE @termoBusca
-        )
-      `;
-    }
-
-    if (clienteId) {
-      req.input('clienteId', sql.VarChar, clienteId);
-      query += ' AND e.cliente_id = @clienteId';
-    }
-
-    if (categoriaId) {
-      req.input('categoriaId', sql.Int, Number(categoriaId));
-      query += ' AND e.categoria_id = @categoriaId';
-    }
-
-    if (marcaId) {
-      req.input('marcaId', sql.VarChar, marcaId);
-      query += ' AND e.marca_id = @marcaId';
-    }
-
-    if (apenasAtivos) {
-      query += ' AND e.ativo = 1';
-    }
-
-    query += ' ORDER BY e.criado_em DESC';
 
     const result = await req.query(query);
     return result.recordset;

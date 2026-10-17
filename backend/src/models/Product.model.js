@@ -1,11 +1,82 @@
 const { getPool, sql } = require('../config/db');
 
 class ProductModel {
-  static async listar({ busca = '', apenasAtivos = true } = {}) {
+  static async listar({
+    busca = '',
+    apenasAtivos = true,
+    orderBy = 'nome',
+    orderDirection = 'ASC',
+    pagina = null,
+    limite = null,
+  } = {}) {
     const pool = await getPool();
     const req = pool.request();
 
-    let query = `
+    let whereClause = 'WHERE 1=1';
+
+    if (busca && String(busca).trim() !== '') {
+      req.input('termoBusca', sql.NVarChar, `%${String(busca).trim()}%`);
+      whereClause += ' AND (nome LIKE @termoBusca OR descricao LIKE @termoBusca)';
+    }
+
+    if (apenasAtivos) {
+      whereClause += ' AND ativo = 1';
+    }
+
+    const mapCamposOrdenacao = {
+      nome: 'nome',
+      preco: 'preco',
+      estoque: 'estoque',
+      criadoEm: 'criado_em',
+      criado_em: 'criado_em',
+      atualizadoEm: 'atualizado_em',
+      atualizado_em: 'atualizado_em',
+      ativo: 'ativo',
+    };
+
+    const campoOrdenacao = mapCamposOrdenacao[orderBy] || 'nome';
+    const direcaoOrdenacao = String(orderDirection).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+
+    if (pagina !== null && limite !== null && Number(pagina) > 0 && Number(limite) > 0) {
+      const countQuery = `
+        SELECT COUNT(1) AS total
+        FROM produtos
+        ${whereClause}
+      `;
+      const countRes = await req.query(countQuery);
+      const total = countRes.recordset[0]?.total || 0;
+
+      const offset = Math.max(0, (Number(pagina) - 1) * Number(limite));
+      req.input('offset', sql.Int, offset);
+      req.input('limite', sql.Int, Number(limite));
+
+      const query = `
+        SELECT 
+          id, 
+          nome, 
+          descricao, 
+          preco, 
+          estoque, 
+          ativo, 
+          criado_em AS criadoEm, 
+          atualizado_em AS atualizadoEm
+        FROM produtos
+        ${whereClause}
+        ORDER BY ${campoOrdenacao} ${direcaoOrdenacao}
+        OFFSET @offset ROWS FETCH NEXT @limite ROWS ONLY
+      `;
+
+      const result = await req.query(query);
+      return {
+        dados: result.recordset,
+        total,
+        pagina: Number(pagina),
+        limite: Number(limite),
+        totalPaginas: Math.ceil(total / Number(limite)) || 1,
+      };
+    }
+
+    const query = `
       SELECT 
         id, 
         nome, 
@@ -16,19 +87,9 @@ class ProductModel {
         criado_em AS criadoEm, 
         atualizado_em AS atualizadoEm
       FROM produtos
-      WHERE 1=1
+      ${whereClause}
+      ORDER BY ${campoOrdenacao} ${direcaoOrdenacao}
     `;
-
-    if (busca && String(busca).trim() !== '') {
-      req.input('termoBusca', sql.NVarChar, `%${String(busca).trim()}%`);
-      query += ' AND (nome LIKE @termoBusca OR descricao LIKE @termoBusca)';
-    }
-
-    if (apenasAtivos) {
-      query += ' AND ativo = 1';
-    }
-
-    query += ' ORDER BY nome ASC';
 
     const result = await req.query(query);
     return result.recordset;

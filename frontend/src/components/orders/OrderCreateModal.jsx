@@ -12,9 +12,11 @@ import {
   Cpu,
   FileText,
   HelpCircle,
+  Search,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { EquipmentSearchModal } from '../common/EquipmentSearchModal';
 
 const TIPOS_REPARO = [
   {
@@ -260,6 +262,18 @@ export const OrderCreateModal = ({ aberto, aoFechar, aoSucesso }) => {
 
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
+  const [modalPesquisaEquipamento, setModalPesquisaEquipamento] = useState(false);
+
+  const clienteSelecionado = clientes.find((c) => String(c.id) === String(clienteId));
+
+  const handleSelecionarEquipamentoPesquisa = (eq) => {
+    if (eq) {
+      if (eq.clienteId && String(eq.clienteId) !== String(clienteId)) {
+        setClienteId(eq.clienteId);
+      }
+      setEquipamentoId(eq.id);
+    }
+  };
 
   // Inicializa respostas com valores padrão conforme o tipo selecionado
   const inicializarRespostas = (codigoTipo) => {
@@ -485,9 +499,20 @@ export const OrderCreateModal = ({ aberto, aoFechar, aoSucesso }) => {
 
                 {/* Equipamento */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Equipamento Cadastrado *
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Equipamento Cadastrado *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setModalPesquisaEquipamento(true)}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition"
+                      title="Abrir modal para pesquisar equipamentos"
+                    >
+                      <Search className="h-3 w-3" />
+                      <span>Pesquisa Avançada</span>
+                    </button>
+                  </div>
                   <select
                     required
                     disabled={!clienteId}
@@ -666,6 +691,15 @@ export const OrderCreateModal = ({ aberto, aoFechar, aoSucesso }) => {
           </button>
         </div>
       </div>
+
+      {/* Modal de Pesquisa Avançada de Equipamentos */}
+      <EquipmentSearchModal
+        aberto={modalPesquisaEquipamento}
+        aoFechar={() => setModalPesquisaEquipamento(false)}
+        aoSelecionar={handleSelecionarEquipamentoPesquisa}
+        clienteIdFiltro={clienteId || null}
+        clienteNomeFiltro={clienteSelecionado?.nome || ''}
+      />
     </div>
   );
 };

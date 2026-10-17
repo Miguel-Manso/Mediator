@@ -137,6 +137,22 @@ export const OrderKanban = ({
     setCardSendoArrastado(null);
   };
 
+  // Trava de segurança global no Window (Bulletproof Cleanup):
+  // Garante que se o usuário soltar o card no vazio ou fora de zonas válidas, o estado é resetado imediatamente
+  useEffect(() => {
+    const limparEstadoArrasto = () => {
+      setCardSendoArrastado(null);
+    };
+
+    window.addEventListener('dragend', limparEstadoArrasto);
+    window.addEventListener('mouseup', limparEstadoArrasto);
+
+    return () => {
+      window.removeEventListener('dragend', limparEstadoArrasto);
+      window.removeEventListener('mouseup', limparEstadoArrasto);
+    };
+  }, []);
+
   // Lida com a soltura (drop) do card na coluna alvo em um índice específico
   const handleDropCard = (e, destinoColunaId, destinoIndex) => {
     try {
@@ -189,10 +205,12 @@ export const OrderKanban = ({
     );
   }
 
+  const ehUnicaColuna = colunasLocais.length === 1 && Boolean(colunasLocais[0]?.isExpandida);
+
   return (
     <div className="relative">
-      {/* ESTEIRA HORIZONTAL DO KANBAN COM SCROLL SUAVE */}
-      <div className="flex items-start gap-4 overflow-x-auto pb-4 pt-1 px-1 scroll-smooth">
+      {/* ESTEIRA DO KANBAN: EXPANDIDA EM COLUNA ÚNICA OU SCROLL HORIZONTAL MULTI-COLUNAS */}
+      <div className={`flex items-start gap-4 pb-4 pt-1 px-1 ${ehUnicaColuna ? 'w-full' : 'overflow-x-auto scroll-smooth'}`}>
         {colunasLocais.map((coluna, index) => (
           <OrderKanbanColumn
             key={coluna.id}
@@ -218,8 +236,8 @@ export const OrderKanban = ({
           />
         ))}
 
-        {/* BOTÃO "+ ADICIONAR COLUNA" NO FINAL DA ESTEIRA HORIZONTAL */}
-        {podeGerenciar && (
+        {/* BOTÃO "+ ADICIONAR COLUNA" NO FINAL DA ESTEIRA (apenas no modo geral com todas as colunas) */}
+        {podeGerenciar && !ehUnicaColuna && (
           <div className="shrink-0 w-72">
             <button
               type="button"

@@ -1,4 +1,5 @@
 const { getPool, sql } = require('../config/db');
+const AddressModel = require('./Address.model');
 
 class ClientModel {
   static async findAll({
@@ -49,12 +50,22 @@ class ClientModel {
     const campoOrdenacao = mapCamposOrdenacao[orderBy] || 'c.nome';
     const direcaoOrdenacao = String(orderDirection).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
 
+    const joinClause = `
+      OUTER APPLY (
+        SELECT TOP 1 ce_sub.endereco_id, ce_sub.tipo, ce_sub.principal
+        FROM cliente_enderecos ce_sub
+        WHERE ce_sub.cliente_id = c.id AND ce_sub.ativo = 1
+        ORDER BY ce_sub.principal DESC, ce_sub.criado_em DESC
+      ) ce
+      LEFT JOIN enderecos e ON ce.endereco_id = e.id
+    `;
+
     // Se paginação for solicitada
     if (pagina !== null && limite !== null && Number(pagina) > 0 && Number(limite) > 0) {
       const countQuery = `
         SELECT COUNT(1) AS total
         FROM clientes c
-        LEFT JOIN enderecos e ON c.endereco_id = e.id
+        ${joinClause}
         ${whereClause}
       `;
       const countRes = await req.query(countQuery);
@@ -73,7 +84,7 @@ class ClientModel {
           c.telefone, 
           COALESCE(e.cidade, 'Viradouro') AS cidade, 
           COALESCE(e.logradouro, '') AS endereco, 
-          c.endereco_id AS enderecoId,
+          ce.endereco_id AS enderecoId,
           c.status, 
           c.ativo,
           c.observacoes, 
@@ -94,7 +105,7 @@ class ClientModel {
           e.cep,
           e.uf
         FROM clientes c
-        LEFT JOIN enderecos e ON c.endereco_id = e.id
+        ${joinClause}
         ${whereClause}
         ORDER BY ${campoOrdenacao} ${direcaoOrdenacao}
         OFFSET @offset ROWS FETCH NEXT @limite ROWS ONLY
@@ -119,7 +130,7 @@ class ClientModel {
         c.telefone, 
         COALESCE(e.cidade, 'Viradouro') AS cidade, 
         COALESCE(e.logradouro, '') AS endereco, 
-        c.endereco_id AS enderecoId,
+        ce.endereco_id AS enderecoId,
         c.status, 
         c.ativo,
         c.observacoes, 
@@ -140,7 +151,7 @@ class ClientModel {
         e.cep,
         e.uf
       FROM clientes c
-      LEFT JOIN enderecos e ON c.endereco_id = e.id
+      ${joinClause}
       ${whereClause}
       ORDER BY ${campoOrdenacao} ${direcaoOrdenacao}
     `;
@@ -168,7 +179,7 @@ class ClientModel {
           c.telefone, 
           COALESCE(e.cidade, 'Viradouro') AS cidade, 
           COALESCE(e.logradouro, '') AS endereco, 
-          c.endereco_id AS enderecoId,
+          ce.endereco_id AS enderecoId,
           c.status, 
           c.ativo,
           c.observacoes, 
@@ -189,11 +200,21 @@ class ClientModel {
           e.cep,
           e.uf
         FROM clientes c
-        LEFT JOIN enderecos e ON c.endereco_id = e.id
+        OUTER APPLY (
+          SELECT TOP 1 ce_sub.endereco_id, ce_sub.tipo, ce_sub.principal
+          FROM cliente_enderecos ce_sub
+          WHERE ce_sub.cliente_id = c.id AND ce_sub.ativo = 1
+          ORDER BY ce_sub.principal DESC, ce_sub.criado_em DESC
+        ) ce
+        LEFT JOIN enderecos e ON ce.endereco_id = e.id
         WHERE c.id = @id
       `);
 
-    return result.recordset[0] || null;
+    const cliente = result.recordset[0] || null;
+    if (cliente) {
+      cliente.enderecos = await AddressModel.findByClienteId(id);
+    }
+    return cliente;
   }
 
   static async findByCpf(cpf) {
@@ -263,21 +284,27 @@ class ClientModel {
       .input('cpf', sql.NVarChar, cpf ? String(cpf).trim() : null)
       .input('email', sql.NVarChar, email ? String(email).trim().toLowerCase() : null)
       .input('telefone', sql.NVarChar, String(telefone).trim())
-      .input('endereco_id', sql.VarChar, enderecoId || null)
       .input('observacoes', sql.NVarChar, observacoes ? String(observacoes).trim() : null)
       .query(`
-        INSERT INTO clientes (id, nome, cpf, email, telefone, endereco_id, status, ativo, observacoes)
+        INSERT INTO clientes (id, nome, cpf, email, telefone, status, ativo, observacoes)
         OUTPUT 
           inserted.id, inserted.nome, inserted.cpf, inserted.email, 
-          inserted.telefone, inserted.endereco_id AS enderecoId,
+          inserted.telefone,
           inserted.status, inserted.ativo, inserted.observacoes, 
           inserted.criado_em AS criadoEm, inserted.atualizado_em AS atualizadoEm
-        VALUES (LOWER(NEWID()), @nome, @cpf, @email, @telefone, @endereco_id, 'ATIVO', 1, @observacoes)
+        VALUES (LOWER(NEWID()), @nome, @cpf, @email, @telefone, 'ATIVO', 1, @observacoes)
       `);
 
     const cliente = result.recordset[0];
+
+    // Se enderecoId foi informado, vincula na tabela intermediária N:N
+    if (enderecoId) {
+      await AddressModel.vincularCliente(cliente.id, enderecoId, { tipo: 'PRINCIPAL', principal: 1 });
+    }
+
     return {
       ...cliente,
+      enderecoId: enderecoId || null,
       name: cliente.nome,
       phone: cliente.telefone,
       notes: cliente.observacoes,
@@ -308,10 +335,6 @@ class ClientModel {
       query += ', telefone = @telefone';
       req.input('telefone', sql.NVarChar, String(dados.telefone).trim());
     }
-    if (dados.enderecoId !== undefined) {
-      query += ', endereco_id = @endereco_id';
-      req.input('endereco_id', sql.VarChar, dados.enderecoId || null);
-    }
     if (dados.observacoes !== undefined) {
       query += ', observacoes = @observacoes';
       req.input('observacoes', sql.NVarChar, dados.observacoes ? String(dados.observacoes).trim() : null);
@@ -331,7 +354,7 @@ class ClientModel {
     query += `
       OUTPUT 
         inserted.id, inserted.nome, inserted.cpf, inserted.email, 
-        inserted.telefone, inserted.endereco_id AS enderecoId,
+        inserted.telefone,
         inserted.status, inserted.ativo, inserted.observacoes, inserted.atualizado_em AS atualizadoEm
       WHERE id = @id
     `;
@@ -341,8 +364,15 @@ class ClientModel {
     const cliente = result.recordset[0];
     if (!cliente) return null;
 
+    if (dados.enderecoId !== undefined) {
+      if (dados.enderecoId) {
+        await AddressModel.vincularCliente(id, dados.enderecoId, { tipo: 'PRINCIPAL', principal: 1 });
+      }
+    }
+
     return {
       ...cliente,
+      enderecoId: dados.enderecoId !== undefined ? dados.enderecoId : undefined,
       name: cliente.nome,
       phone: cliente.telefone,
       notes: cliente.observacoes,

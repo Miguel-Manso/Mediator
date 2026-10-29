@@ -8,4 +8,9 @@ router.post('/', userController.criar);
 router.put('/:id', userController.atualizar);
 router.delete('/:id', userController.excluir);
 
+// Gerenciamento de múltiplos endereços (N:N)
+router.get('/:id/enderecos', userController.listarEnderecos);
+router.post('/:id/enderecos', userController.adicionarEndereco);
+router.delete('/:id/enderecos/:enderecoId', userController.removerEndereco);
+
 module.exports = router;

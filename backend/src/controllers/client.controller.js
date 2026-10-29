@@ -82,12 +82,12 @@ const clientController = {
         }
       }
 
-      // 4. Criar registro de endereco caso haja dados de localizacao
-      let enderecoId = null;
+      // 4. Criar ou reutilizar registro de endereco caso haja dados de localizacao
+      let enderecoId = req.body.enderecoId || null;
       const logradouroFinal = logradouro || endereco;
       if (logradouroFinal && String(logradouroFinal).trim() !== '') {
         try {
-          const enderecoCriado = await AddressModel.create({
+          const enderecoCriado = await AddressModel.findOrCreate({
             logradouro: String(logradouroFinal).trim(),
             numero: numero ? String(numero).trim() : null,
             complemento: complemento ? String(complemento).trim() : null,
@@ -111,6 +111,10 @@ const clientController = {
         enderecoId,
         observacoes: observacoes ? String(observacoes).trim() : null,
       });
+
+      if (cliente && cliente.id) {
+        cliente.enderecos = await AddressModel.findByClienteId(cliente.id);
+      }
 
       // 7. Registro de auditoria em logs_sistema
       try {
@@ -225,9 +229,11 @@ const clientController = {
       // Atualizar ou criar registro de endereco estruturado exclusivamente via AddressModel
       const logradouroFinal = logradouro || endereco;
       if (logradouroFinal || numero || bairro || cep || uf || cidade) {
-        if (clienteExistente.endereco_id || clienteExistente.enderecoId) {
-          const idEnd = clienteExistente.endereco_id || clienteExistente.enderecoId;
-          await AddressModel.update(idEnd, {
+        const enderecosVinculados = await AddressModel.findByClienteId(id);
+        const principalEnd = enderecosVinculados.find((e) => e.principal) || enderecosVinculados[0];
+
+        if (principalEnd) {
+          await AddressModel.update(principalEnd.id, {
             logradouro: logradouroFinal ? String(logradouroFinal).trim() : undefined,
             numero: numero !== undefined ? (numero ? String(numero).trim() : null) : undefined,
             complemento: complemento !== undefined ? (complemento ? String(complemento).trim() : null) : undefined,
@@ -237,7 +243,7 @@ const clientController = {
             cep: cep !== undefined ? (cep ? String(cep).trim() : null) : undefined,
           });
         } else if (logradouroFinal && String(logradouroFinal).trim() !== '') {
-          const novoEnd = await AddressModel.create({
+          const novoEnd = await AddressModel.findOrCreate({
             logradouro: String(logradouroFinal).trim(),
             numero: numero ? String(numero).trim() : null,
             complemento: complemento ? String(complemento).trim() : null,
@@ -246,11 +252,16 @@ const clientController = {
             uf: uf ? String(uf).trim().toUpperCase() : 'SP',
             cep: cep ? String(cep).trim() : null,
           });
-          dadosAtualizacao.enderecoId = novoEnd.id;
+          await AddressModel.vincularCliente(id, novoEnd.id, { tipo: 'PRINCIPAL', principal: 1 });
         }
+      } else if (req.body.enderecoId) {
+        await AddressModel.vincularCliente(id, req.body.enderecoId, { tipo: 'PRINCIPAL', principal: 1 });
       }
 
       const clienteAtualizado = await ClientModel.update(id, dadosAtualizacao);
+      if (clienteAtualizado) {
+        clienteAtualizado.enderecos = await AddressModel.findByClienteId(id);
+      }
 
       // Auditoria
       try {
@@ -329,6 +340,74 @@ const clientController = {
     } catch (erro) {
       console.error('Erro ao excluir cliente:', erro);
       return res.status(500).json({ error: erro.message || 'Erro ao excluir cliente.' });
+    }
+  },
+
+  // Listar todos os endereços do cliente
+  async listarEnderecos(req, res) {
+    try {
+      const { id } = req.params;
+      const enderecos = await AddressModel.findByClienteId(id);
+      return res.json(enderecos);
+    } catch (erro) {
+      console.error('Erro ao listar endereços do cliente:', erro);
+      return res.status(500).json({ error: 'Erro ao consultar endereços do cliente.' });
+    }
+  },
+
+  // Adicionar ou vincular endereço ao cliente
+  async adicionarEndereco(req, res) {
+    try {
+      const { id } = req.params;
+      const {
+        enderecoId,
+        tipo = 'OUTRO',
+        principal = 0,
+        logradouro,
+        numero,
+        complemento,
+        bairro,
+        cidade,
+        uf,
+        cep,
+      } = req.body || {};
+
+      let endId = enderecoId;
+      if (!endId && logradouro) {
+        const enderecoCriado = await AddressModel.findOrCreate({
+          logradouro,
+          numero,
+          complemento,
+          bairro,
+          cidade,
+          uf,
+          cep,
+        });
+        endId = enderecoCriado.id;
+      }
+
+      if (!endId) {
+        return res.status(400).json({ error: 'ID do endereço ou dados de logradouro são obrigatórios.' });
+      }
+
+      await AddressModel.vincularCliente(id, endId, { tipo, principal });
+      const enderecos = await AddressModel.findByClienteId(id);
+      return res.status(201).json(enderecos);
+    } catch (erro) {
+      console.error('Erro ao adicionar endereço ao cliente:', erro);
+      return res.status(500).json({ error: 'Erro ao vincular endereço ao cliente.' });
+    }
+  },
+
+  // Desvincular endereço do cliente
+  async removerEndereco(req, res) {
+    try {
+      const { id, enderecoId } = req.params;
+      await AddressModel.desvincularCliente(id, enderecoId);
+      return res.json({ message: 'Endereço desvinculado com sucesso.' });
+    } catch (erro) {
+      console.error('Erro ao desvincular endereço do cliente:', erro);
+      return res.status(500).json({ error: 'Erro ao desvincular endereço do cliente.' });
     }
   },
 };

@@ -29,9 +29,10 @@ DECLARE @enderecoPadraoId VARCHAR(36) = (SELECT TOP 1 id FROM enderecos WHERE ci
 
 WHILE @i_cli <= 100
 BEGIN
-    INSERT INTO clientes (id, nome, cpf, email, telefone, endereco_id, status, ativo)
+    DECLARE @novoClienteId VARCHAR(36) = LOWER(NEWID());
+    INSERT INTO clientes (id, nome, cpf, email, telefone, status, ativo)
     VALUES (
-        LOWER(NEWID()),
+        @novoClienteId,
         'Cliente Teste ' + RIGHT('000' + CAST(@i_cli AS VARCHAR), 3),
         RIGHT('000' + CAST((ABS(CHECKSUM(NEWID())) % 999) AS VARCHAR), 3) + '.' +
         RIGHT('000' + CAST((ABS(CHECKSUM(NEWID())) % 999) AS VARCHAR), 3) + '.' +
@@ -39,10 +40,16 @@ BEGIN
         RIGHT('00'  + CAST((@i_cli % 99) AS VARCHAR), 2),
         'cliente.teste' + CAST(@i_cli AS VARCHAR) + '@mediator.mock.com',
         '(17) 99' + RIGHT('000' + CAST(ABS(CHECKSUM(NEWID())) % 999 AS VARCHAR), 3) + '-' + RIGHT('0000' + CAST(@i_cli AS VARCHAR), 4),
-        @enderecoPadraoId,
         'ATIVO',
         1
     );
+
+    IF @enderecoPadraoId IS NOT NULL
+    BEGIN
+        INSERT INTO cliente_enderecos (id, cliente_id, endereco_id, tipo, principal, ativo)
+        VALUES (LOWER(NEWID()), @novoClienteId, @enderecoPadraoId, 'PRINCIPAL', 1, 1);
+    END
+
     SET @i_cli = @i_cli + 1;
 END
 PRINT '100 Clientes inseridos com sucesso.';

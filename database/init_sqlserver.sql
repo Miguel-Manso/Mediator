@@ -47,7 +47,6 @@ BEGIN
         status NVARCHAR(20) NOT NULL DEFAULT 'ATIVO',    -- 'ATIVO', 'INATIVO'
         ativo BIT DEFAULT 1,
         telefone NVARCHAR(20) NULL,
-        endereco_id VARCHAR(36) NULL FOREIGN KEY REFERENCES enderecos(id) ON DELETE SET NULL,
         criado_em DATETIME2 DEFAULT GETDATE(),
         atualizado_em DATETIME2 DEFAULT GETDATE()
     );
@@ -66,10 +65,6 @@ BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('usuarios') AND name = 'ativo')
     BEGIN
         ALTER TABLE usuarios ADD ativo BIT DEFAULT 1;
-    END
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('usuarios') AND name = 'endereco_id')
-    BEGIN
-        ALTER TABLE usuarios ADD endereco_id VARCHAR(36) NULL FOREIGN KEY REFERENCES enderecos(id) ON DELETE SET NULL;
     END
     -- Drop legado de cidade se existir
     IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('usuarios') AND name = 'cidade')
@@ -91,7 +86,6 @@ BEGIN
         cpf NVARCHAR(14) UNIQUE NULL,
         email NVARCHAR(180) NULL,
         telefone NVARCHAR(20) NOT NULL,
-        endereco_id VARCHAR(36) NULL FOREIGN KEY REFERENCES enderecos(id) ON DELETE SET NULL,
         status NVARCHAR(20) NOT NULL DEFAULT 'ATIVO',
         ativo BIT DEFAULT 1,
         observacoes NVARCHAR(MAX) NULL,
@@ -109,10 +103,6 @@ BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('clientes') AND name = 'ativo')
     BEGIN
         ALTER TABLE clientes ADD ativo BIT DEFAULT 1;
-    END
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('clientes') AND name = 'endereco_id')
-    BEGIN
-        ALTER TABLE clientes ADD endereco_id VARCHAR(36) NULL FOREIGN KEY REFERENCES enderecos(id) ON DELETE SET NULL;
     END
     -- Drop de senha_hash caso exista (clientes nao possuem acesso ao sistema)
     IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('clientes') AND name = 'senha_hash')
@@ -134,6 +124,106 @@ BEGIN
     BEGIN
         ALTER TABLE clientes DROP COLUMN endereco;
     END
+END
+GO
+
+-- 4. TABELA INTERMEDIARIA CLIENTE-ENDERECO (cliente_enderecos - N:N)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'cliente_enderecos')
+BEGIN
+    CREATE TABLE cliente_enderecos (
+        id VARCHAR(36) PRIMARY KEY DEFAULT LOWER(NEWID()),
+        cliente_id VARCHAR(36) NOT NULL FOREIGN KEY REFERENCES clientes(id) ON DELETE CASCADE,
+        endereco_id VARCHAR(36) NOT NULL FOREIGN KEY REFERENCES enderecos(id) ON DELETE CASCADE,
+        tipo NVARCHAR(50) DEFAULT 'PRINCIPAL', -- 'PRINCIPAL', 'RESIDENCIAL', 'COMERCIAL', 'COBRANCA', 'ENTREGA'
+        principal BIT DEFAULT 1,
+        ativo BIT DEFAULT 1,
+        criado_em DATETIME2 DEFAULT GETDATE(),
+        atualizado_em DATETIME2 DEFAULT GETDATE(),
+        CONSTRAINT UQ_cliente_enderecos UNIQUE (cliente_id, endereco_id)
+    );
+    CREATE INDEX idx_cliente_enderecos_cliente ON cliente_enderecos(cliente_id);
+    CREATE INDEX idx_cliente_enderecos_endereco ON cliente_enderecos(endereco_id);
+    CREATE INDEX idx_cliente_enderecos_ativo ON cliente_enderecos(ativo);
+    PRINT 'Tabela cliente_enderecos criada com sucesso.';
+END
+GO
+
+-- 5. TABELA INTERMEDIARIA USUARIO-ENDERECO (usuario_enderecos - N:N)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'usuario_enderecos')
+BEGIN
+    CREATE TABLE usuario_enderecos (
+        id VARCHAR(36) PRIMARY KEY DEFAULT LOWER(NEWID()),
+        usuario_id VARCHAR(36) NOT NULL FOREIGN KEY REFERENCES usuarios(id) ON DELETE CASCADE,
+        endereco_id VARCHAR(36) NOT NULL FOREIGN KEY REFERENCES enderecos(id) ON DELETE CASCADE,
+        tipo NVARCHAR(50) DEFAULT 'PRINCIPAL', -- 'PRINCIPAL', 'RESIDENCIAL', 'COMERCIAL'
+        principal BIT DEFAULT 1,
+        ativo BIT DEFAULT 1,
+        criado_em DATETIME2 DEFAULT GETDATE(),
+        atualizado_em DATETIME2 DEFAULT GETDATE(),
+        CONSTRAINT UQ_usuario_enderecos UNIQUE (usuario_id, endereco_id)
+    );
+    CREATE INDEX idx_usuario_enderecos_usuario ON usuario_enderecos(usuario_id);
+    CREATE INDEX idx_usuario_enderecos_endereco ON usuario_enderecos(endereco_id);
+    CREATE INDEX idx_usuario_enderecos_ativo ON usuario_enderecos(ativo);
+    PRINT 'Tabela usuario_enderecos criada com sucesso.';
+END
+GO
+
+-- MIGRAÇÃO DE COLUNAS LEGADAS endereco_id EM usuarios E clientes (SE EXISTIREM)
+-- Executado via Dynamic SQL (EXEC) para evitar erro 207 em tempo de parse/compilação do SQL Server
+IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('usuarios') AND name = 'endereco_id')
+BEGIN
+    EXEC('
+        INSERT INTO usuario_enderecos (id, usuario_id, endereco_id, tipo, principal, ativo)
+        SELECT LOWER(NEWID()), u.id, u.endereco_id, ''PRINCIPAL'', 1, 1
+        FROM usuarios u
+        WHERE u.endereco_id IS NOT NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM usuario_enderecos ue 
+              WHERE ue.usuario_id = u.id AND ue.endereco_id = u.endereco_id
+          );
+    ');
+
+    DECLARE @fkUserEnd NVARCHAR(128);
+    SELECT @fkUserEnd = fk.name
+    FROM sys.foreign_keys fk
+    INNER JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
+    WHERE fkc.parent_object_id = OBJECT_ID('usuarios')
+      AND COL_NAME(fkc.parent_object_id, fkc.parent_column_id) = 'endereco_id';
+
+    IF @fkUserEnd IS NOT NULL
+        EXEC('ALTER TABLE usuarios DROP CONSTRAINT ' + @fkUserEnd);
+
+    EXEC('ALTER TABLE usuarios DROP COLUMN endereco_id');
+    PRINT 'Coluna legada endereco_id migrada e removida de usuarios com sucesso.';
+END
+GO
+
+IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('clientes') AND name = 'endereco_id')
+BEGIN
+    EXEC('
+        INSERT INTO cliente_enderecos (id, cliente_id, endereco_id, tipo, principal, ativo)
+        SELECT LOWER(NEWID()), c.id, c.endereco_id, ''PRINCIPAL'', 1, 1
+        FROM clientes c
+        WHERE c.endereco_id IS NOT NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM cliente_enderecos ce 
+              WHERE ce.cliente_id = c.id AND ce.endereco_id = c.endereco_id
+          );
+    ');
+
+    DECLARE @fkCliEnd NVARCHAR(128);
+    SELECT @fkCliEnd = fk.name
+    FROM sys.foreign_keys fk
+    INNER JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
+    WHERE fkc.parent_object_id = OBJECT_ID('clientes')
+      AND COL_NAME(fkc.parent_object_id, fkc.parent_column_id) = 'endereco_id';
+
+    IF @fkCliEnd IS NOT NULL
+        EXEC('ALTER TABLE clientes DROP CONSTRAINT ' + @fkCliEnd);
+
+    EXEC('ALTER TABLE clientes DROP COLUMN endereco_id');
+    PRINT 'Coluna legada endereco_id migrada e removida de clientes com sucesso.';
 END
 GO
 
@@ -763,20 +853,33 @@ END
 
 IF NOT EXISTS (SELECT 1 FROM usuarios WHERE email = 'admin@mediator.com')
 BEGIN
-    INSERT INTO usuarios (id, nome, email, senha_hash, cargo, status, ativo, telefone, endereco_id)
-    VALUES (LOWER(NEWID()), 'Administrador Rocha Magazine', 'admin@mediator.com', '$2a$12$e8w6Q3U48uBgl6rD46m/7.qYfV/YjLdNu0m8C98W0dCq6U6p1mC5G', 'ADMIN', 'ATIVO', 1, '(17) 99999-0001', @enderecoPadraoId);
+    INSERT INTO usuarios (id, nome, email, senha_hash, cargo, status, ativo, telefone)
+    VALUES (LOWER(NEWID()), 'Administrador Rocha Magazine', 'admin@mediator.com', '$2a$12$e8w6Q3U48uBgl6rD46m/7.qYfV/YjLdNu0m8C98W0dCq6U6p1mC5G', 'ADMIN', 'ATIVO', 1, '(17) 99999-0001');
 END
 
 IF NOT EXISTS (SELECT 1 FROM usuarios WHERE email = 'ana@mediator.com')
 BEGIN
-    INSERT INTO usuarios (id, nome, email, senha_hash, cargo, status, ativo, telefone, endereco_id)
-    VALUES (LOWER(NEWID()), 'Ana Costa (Atendente)', 'ana@mediator.com', '$2a$12$P5qLhA2c7t35fM2B26Z9j.56s3TfQ8R2F2b3.Y6B5xK8v7Q2s0b5a', 'ATENDENTE', 'ATIVO', 1, '(17) 99999-0002', @enderecoPadraoId);
+    INSERT INTO usuarios (id, nome, email, senha_hash, cargo, status, ativo, telefone)
+    VALUES (LOWER(NEWID()), 'Ana Costa (Atendente)', 'ana@mediator.com', '$2a$12$P5qLhA2c7t35fM2B26Z9j.56s3TfQ8R2F2b3.Y6B5xK8v7Q2s0b5a', 'ATENDENTE', 'ATIVO', 1, '(17) 99999-0002');
 END
 
 IF NOT EXISTS (SELECT 1 FROM usuarios WHERE email = 'carlos@mediator.com')
 BEGIN
-    INSERT INTO usuarios (id, nome, email, senha_hash, cargo, status, ativo, telefone, endereco_id)
-    VALUES (LOWER(NEWID()), 'Carlos Souza (Tecnico)', 'carlos@mediator.com', '$2a$12$P5qLhA2c7t35fM2B26Z9j.56s3TfQ8R2F2b3.Y6B5xK8v7Q2s0b5a', 'TECNICO', 'ATIVO', 1, '(17) 99999-0003', @enderecoPadraoId);
+    INSERT INTO usuarios (id, nome, email, senha_hash, cargo, status, ativo, telefone)
+    VALUES (LOWER(NEWID()), 'Carlos Souza (Tecnico)', 'carlos@mediator.com', '$2a$12$P5qLhA2c7t35fM2B26Z9j.56s3TfQ8R2F2b3.Y6B5xK8v7Q2s0b5a', 'TECNICO', 'ATIVO', 1, '(17) 99999-0003');
+END
+
+-- Vincular endereço padrão aos usuários padrão através da tabela intermediária N:N
+IF @enderecoPadraoId IS NOT NULL
+BEGIN
+    INSERT INTO usuario_enderecos (id, usuario_id, endereco_id, tipo, principal, ativo)
+    SELECT LOWER(NEWID()), u.id, @enderecoPadraoId, 'PRINCIPAL', 1, 1
+    FROM usuarios u
+    WHERE u.email IN ('admin@mediator.com', 'ana@mediator.com', 'carlos@mediator.com')
+      AND NOT EXISTS (
+          SELECT 1 FROM usuario_enderecos ue 
+          WHERE ue.usuario_id = u.id AND ue.endereco_id = @enderecoPadraoId
+      );
 END
 GO
 

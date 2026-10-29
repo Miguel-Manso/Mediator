@@ -24,4 +24,17 @@ router.delete(
   clientController.excluir
 );
 
+// Gerenciamento de múltiplos endereços (N:N)
+router.get('/:id/enderecos', clientController.listarEnderecos);
+router.post(
+  '/:id/enderecos',
+  roleMiddleware(['ADMIN', 'ATENDENTE', 'TECNICO']),
+  clientController.adicionarEndereco
+);
+router.delete(
+  '/:id/enderecos/:enderecoId',
+  roleMiddleware(['ADMIN', 'ATENDENTE', 'TECNICO']),
+  clientController.removerEndereco
+);
+
 module.exports = router;

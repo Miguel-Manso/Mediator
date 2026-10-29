@@ -102,12 +102,12 @@ const userController = {
       // 6. Criptografia da senha
       const senhaHash = await bcrypt.hash(String(senha), 10);
 
-      // 6.1 Criar endereco normalizado via AddressModel caso dados tenham sido informados
+      // 6.1 Criar ou reutilizar endereco normalizado via AddressModel caso dados tenham sido informados
       let enderecoId = enderecoIdReq || null;
       const logradouroFinal = logradouro || endereco;
       if (logradouroFinal || numero || bairro || cep || uf || cidade) {
         try {
-          const enderecoCriado = await AddressModel.create({
+          const enderecoCriado = await AddressModel.findOrCreate({
             logradouro: logradouroFinal ? String(logradouroFinal).trim() : 'Não informado',
             numero: numero ? String(numero).trim() : null,
             complemento: complemento ? String(complemento).trim() : null,
@@ -132,6 +132,10 @@ const userController = {
         telefone: telefone ? String(telefone).trim() : null,
         enderecoId,
       });
+
+      if (usuario && usuario.id) {
+        usuario.enderecos = await AddressModel.findByUsuarioId(usuario.id);
+      }
 
       // 8. Registro de auditoria em logs_sistema
       try {
@@ -278,9 +282,11 @@ const userController = {
       // Atualizar ou criar registro de endereço normalizado exclusivamente via AddressModel
       const logradouroFinal = logradouro || endereco;
       if (logradouroFinal || numero || bairro || cep || uf || cidade) {
-        const idEnd = usuarioExistente.endereco_id || usuarioExistente.enderecoId;
-        if (idEnd) {
-          await AddressModel.update(idEnd, {
+        const enderecosVinculados = await AddressModel.findByUsuarioId(id);
+        const principalEnd = enderecosVinculados.find((e) => e.principal) || enderecosVinculados[0];
+
+        if (principalEnd) {
+          await AddressModel.update(principalEnd.id, {
             logradouro: logradouroFinal ? String(logradouroFinal).trim() : undefined,
             numero: numero !== undefined ? (numero ? String(numero).trim() : null) : undefined,
             complemento: complemento !== undefined ? (complemento ? String(complemento).trim() : null) : undefined,
@@ -290,7 +296,7 @@ const userController = {
             cep: cep !== undefined ? (cep ? String(cep).trim() : null) : undefined,
           });
         } else if (logradouroFinal && String(logradouroFinal).trim() !== '') {
-          const novoEnd = await AddressModel.create({
+          const novoEnd = await AddressModel.findOrCreate({
             logradouro: String(logradouroFinal).trim(),
             numero: numero ? String(numero).trim() : null,
             complemento: complemento ? String(complemento).trim() : null,
@@ -299,11 +305,16 @@ const userController = {
             uf: uf ? String(uf).trim().toUpperCase() : 'SP',
             cep: cep ? String(cep).trim() : null,
           });
-          dadosAtualizacao.enderecoId = novoEnd.id;
+          await AddressModel.vincularUsuario(id, novoEnd.id, { tipo: 'PRINCIPAL', principal: 1 });
         }
+      } else if (enderecoId) {
+        await AddressModel.vincularUsuario(id, enderecoId, { tipo: 'PRINCIPAL', principal: 1 });
       }
 
       const usuarioAtualizado = await UserModel.update(id, dadosAtualizacao);
+      if (usuarioAtualizado) {
+        usuarioAtualizado.enderecos = await AddressModel.findByUsuarioId(id);
+      }
 
       // Auditoria
       try {
@@ -399,6 +410,74 @@ const userController = {
     } catch (erro) {
       console.error('Erro ao desativar usuário:', erro);
       return res.status(500).json({ error: erro.message || 'Erro ao desativar colaborador.' });
+    }
+  },
+
+  // Listar todos os endereços do colaborador
+  async listarEnderecos(req, res) {
+    try {
+      const { id } = req.params;
+      const enderecos = await AddressModel.findByUsuarioId(id);
+      return res.json(enderecos);
+    } catch (erro) {
+      console.error('Erro ao listar endereços do colaborador:', erro);
+      return res.status(500).json({ error: 'Erro ao consultar endereços do colaborador.' });
+    }
+  },
+
+  // Adicionar ou vincular endereço ao colaborador
+  async adicionarEndereco(req, res) {
+    try {
+      const { id } = req.params;
+      const {
+        enderecoId,
+        tipo = 'OUTRO',
+        principal = 0,
+        logradouro,
+        numero,
+        complemento,
+        bairro,
+        cidade,
+        uf,
+        cep,
+      } = req.body || {};
+
+      let endId = enderecoId;
+      if (!endId && logradouro) {
+        const enderecoCriado = await AddressModel.findOrCreate({
+          logradouro,
+          numero,
+          complemento,
+          bairro,
+          cidade,
+          uf,
+          cep,
+        });
+        endId = enderecoCriado.id;
+      }
+
+      if (!endId) {
+        return res.status(400).json({ error: 'ID do endereço ou dados de logradouro são obrigatórios.' });
+      }
+
+      await AddressModel.vincularUsuario(id, endId, { tipo, principal });
+      const enderecos = await AddressModel.findByUsuarioId(id);
+      return res.status(201).json(enderecos);
+    } catch (erro) {
+      console.error('Erro ao adicionar endereço ao colaborador:', erro);
+      return res.status(500).json({ error: 'Erro ao vincular endereço ao colaborador.' });
+    }
+  },
+
+  // Desvincular endereço do colaborador
+  async removerEndereco(req, res) {
+    try {
+      const { id, enderecoId } = req.params;
+      await AddressModel.desvincularUsuario(id, enderecoId);
+      return res.json({ message: 'Endereço desvinculado com sucesso.' });
+    } catch (erro) {
+      console.error('Erro ao desvincular endereço do colaborador:', erro);
+      return res.status(500).json({ error: 'Erro ao desvincular endereço do colaborador.' });
     }
   },
 };

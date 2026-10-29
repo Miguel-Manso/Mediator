@@ -1,4 +1,5 @@
 const { getPool, sql } = require('../config/db');
+const AddressModel = require('./Address.model');
 
 class UserModel {
   static async findAll({ apenasAtivos = true, busca = '' } = {}) {
@@ -15,7 +16,7 @@ class UserModel {
         u.ativo,
         u.telefone, 
         COALESCE(e.cidade, 'Viradouro') AS cidade, 
-        u.endereco_id AS enderecoId,
+        ue.endereco_id AS enderecoId,
         u.criado_em AS criadoEm,
         u.atualizado_em AS atualizadoEm,
         u.nome AS name,
@@ -32,7 +33,13 @@ class UserModel {
         e.cep,
         e.uf
       FROM usuarios u
-      LEFT JOIN enderecos e ON u.endereco_id = e.id
+      OUTER APPLY (
+        SELECT TOP 1 ue_sub.endereco_id, ue_sub.tipo, ue_sub.principal
+        FROM usuario_enderecos ue_sub
+        WHERE ue_sub.usuario_id = u.id AND ue_sub.ativo = 1
+        ORDER BY ue_sub.principal DESC, ue_sub.criado_em DESC
+      ) ue
+      LEFT JOIN enderecos e ON ue.endereco_id = e.id
       WHERE 1=1
     `;
 
@@ -69,7 +76,7 @@ class UserModel {
           u.ativo,
           u.telefone, 
           COALESCE(e.cidade, 'Viradouro') AS cidade, 
-          u.endereco_id AS enderecoId,
+          ue.endereco_id AS enderecoId,
           u.criado_em AS criadoEm,
           u.atualizado_em AS atualizadoEm,
           u.nome AS name,
@@ -86,11 +93,21 @@ class UserModel {
           e.cep,
           e.uf
         FROM usuarios u
-        LEFT JOIN enderecos e ON u.endereco_id = e.id
+        OUTER APPLY (
+          SELECT TOP 1 ue_sub.endereco_id, ue_sub.tipo, ue_sub.principal
+          FROM usuario_enderecos ue_sub
+          WHERE ue_sub.usuario_id = u.id AND ue_sub.ativo = 1
+          ORDER BY ue_sub.principal DESC, ue_sub.criado_em DESC
+        ) ue
+        LEFT JOIN enderecos e ON ue.endereco_id = e.id
         WHERE u.id = @id
       `);
 
-    return result.recordset[0] || null;
+    const usuario = result.recordset[0] || null;
+    if (usuario) {
+      usuario.enderecos = await AddressModel.findByUsuarioId(id);
+    }
+    return usuario;
   }
 
   static async findByEmail(email) {
@@ -102,9 +119,15 @@ class UserModel {
       .query(`
         SELECT 
           u.id, u.nome, u.email, u.cpf, u.senha_hash, u.cargo, u.status, u.ativo, u.telefone, 
-          COALESCE(e.cidade, 'Viradouro') AS cidade, u.endereco_id
+          COALESCE(e.cidade, 'Viradouro') AS cidade, ue.endereco_id AS enderecoId
         FROM usuarios u
-        LEFT JOIN enderecos e ON u.endereco_id = e.id
+        OUTER APPLY (
+          SELECT TOP 1 ue_sub.endereco_id, ue_sub.tipo, ue_sub.principal
+          FROM usuario_enderecos ue_sub
+          WHERE ue_sub.usuario_id = u.id AND ue_sub.ativo = 1
+          ORDER BY ue_sub.principal DESC, ue_sub.criado_em DESC
+        ) ue
+        LEFT JOIN enderecos e ON ue.endereco_id = e.id
         WHERE LOWER(u.email) = @email
       `);
 
@@ -159,20 +182,26 @@ class UserModel {
       .input('senha_hash', sql.NVarChar, senhaHash)
       .input('cargo', sql.NVarChar, String(cargo).toUpperCase())
       .input('telefone', telefone ? String(telefone).trim() : null)
-      .input('endereco_id', sql.VarChar, enderecoId || null)
       .query(`
-        INSERT INTO usuarios (id, nome, email, cpf, senha_hash, cargo, status, ativo, telefone, endereco_id)
+        INSERT INTO usuarios (id, nome, email, cpf, senha_hash, cargo, status, ativo, telefone)
         OUTPUT 
           inserted.id, inserted.nome, inserted.email, inserted.cpf, inserted.cargo, 
           inserted.status, inserted.ativo, inserted.telefone, 
-          inserted.endereco_id AS enderecoId, inserted.criado_em AS criadoEm, 
+          inserted.criado_em AS criadoEm, 
           inserted.atualizado_em AS atualizadoEm
-        VALUES (LOWER(NEWID()), @nome, @email, @cpf, @senha_hash, @cargo, 'ATIVO', 1, @telefone, @endereco_id)
+        VALUES (LOWER(NEWID()), @nome, @email, @cpf, @senha_hash, @cargo, 'ATIVO', 1, @telefone)
       `);
 
     const user = result.recordset[0];
+
+    // Se enderecoId foi informado, vincula na tabela intermediária N:N
+    if (enderecoId) {
+      await AddressModel.vincularUsuario(user.id, enderecoId, { tipo: 'PRINCIPAL', principal: 1 });
+    }
+
     return {
       ...user,
+      enderecoId: enderecoId || null,
       name: user.nome,
       role: user.cargo,
       phone: user.telefone,
@@ -222,16 +251,12 @@ class UserModel {
       query += ', telefone = @telefone';
       req.input('telefone', sql.NVarChar, dados.telefone ? String(dados.telefone).trim() : null);
     }
-    if (dados.enderecoId !== undefined) {
-      query += ', endereco_id = @endereco_id';
-      req.input('endereco_id', sql.VarChar, dados.enderecoId || null);
-    }
 
     query += `
       OUTPUT 
         inserted.id, inserted.nome, inserted.email, inserted.cpf, inserted.cargo, 
         inserted.status, inserted.ativo, inserted.telefone, 
-        inserted.endereco_id AS enderecoId, inserted.criado_em AS criadoEm, 
+        inserted.criado_em AS criadoEm, 
         inserted.atualizado_em AS atualizadoEm
       WHERE id = @id
     `;
@@ -241,8 +266,15 @@ class UserModel {
     const user = result.recordset[0];
     if (!user) return null;
 
+    if (dados.enderecoId !== undefined) {
+      if (dados.enderecoId) {
+        await AddressModel.vincularUsuario(id, dados.enderecoId, { tipo: 'PRINCIPAL', principal: 1 });
+      }
+    }
+
     return {
       ...user,
+      enderecoId: dados.enderecoId !== undefined ? dados.enderecoId : undefined,
       name: user.nome,
       role: user.cargo,
       phone: user.telefone,

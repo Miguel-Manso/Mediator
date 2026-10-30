@@ -254,6 +254,7 @@ BEGIN
 END
 GO
 
+<<<<<<< HEAD
 -- 4.1 TABELA DE AUDITORIA (AuditLogs - RF11)
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'AuditLogs')
 BEGIN
@@ -277,6 +278,8 @@ BEGIN
 END
 GO
 
+=======
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
 -- 5. CATEGORIAS DE EQUIPAMENTO (categorias_equipamento)
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'categorias_equipamento')
 BEGIN

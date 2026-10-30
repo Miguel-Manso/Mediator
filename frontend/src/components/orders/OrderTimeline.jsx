@@ -242,7 +242,11 @@ export const OrderTimeline = ({
           </div>
 
           {/* Grupo de Filtros Estilo Pills / Toggle */}
+<<<<<<< HEAD
           <div className="flex flex-wrap items-center gap-1.5 bg-slate-100/90 p-1.5 rounded-lg self-start sm:self-auto border border-slate-200/60 w-full sm:w-auto">
+=======
+          <div className="inline-flex items-center gap-1 bg-slate-100/90 p-1 rounded-lg self-start sm:self-auto border border-slate-200/60">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
             <button
               type="button"
               onClick={() => setFiltro('TODOS')}
@@ -254,7 +258,11 @@ export const OrderTimeline = ({
             >
               <span>Todos</span>
               <span
+<<<<<<< HEAD
                 className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+=======
+                className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                   filtro === 'TODOS' ? 'bg-slate-200/80 text-slate-800' : 'bg-slate-200/50 text-slate-500'
                 }`}
               >
@@ -271,10 +279,17 @@ export const OrderTimeline = ({
                   : 'text-slate-500 hover:text-emerald-700'
               }`}
             >
+<<<<<<< HEAD
               <Wrench className="h-3 w-3 shrink-0" />
               <span>Pareceres Técnicos</span>
               <span
                 className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+=======
+              <Wrench className="h-3 w-3" />
+              <span>Pareceres Técnicos</span>
+              <span
+                className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                   filtro === 'PARECER' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200/50 text-slate-500'
                 }`}
               >
@@ -291,10 +306,17 @@ export const OrderTimeline = ({
                   : 'text-slate-500 hover:text-indigo-700'
               }`}
             >
+<<<<<<< HEAD
               <ArrowRight className="h-3 w-3 shrink-0" />
               <span>Mudanças de Status</span>
               <span
                 className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+=======
+              <ArrowRight className="h-3 w-3" />
+              <span>Mudanças de Status</span>
+              <span
+                className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                   filtro === 'STATUS' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200/50 text-slate-500'
                 }`}
               >

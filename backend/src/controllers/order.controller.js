@@ -4,13 +4,18 @@ const OrderStatusModel = require('../models/OrderStatus.model');
 const socketService = require('../services/socket.service');
 
 const orderController = {
+<<<<<<< HEAD
   // Listagem de OS com filtros dinâmicos e paginação (RF09)
+=======
+  // Listagem de OS com filtros e paginação
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
   async listar(req, res) {
     try {
       const {
         busca,
         search,
         clienteId,
+<<<<<<< HEAD
         cliente,
         tecnicoId,
         tecnico,
@@ -28,6 +33,10 @@ const orderController = {
         dataEntradaInicio,
         dataFim,
         dataEntradaFim,
+=======
+        tecnicoId,
+        statusId,
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
         pagina = 1,
         limite = 20,
         apenasAtivos,
@@ -36,6 +45,7 @@ const orderController = {
       const resultado = await OrderModel.listar({
         busca: busca || search || '',
         clienteId: clienteId || null,
+<<<<<<< HEAD
         cliente: cliente || null,
         tecnicoId: tecnicoId || null,
         tecnico: tecnico || null,
@@ -47,6 +57,10 @@ const orderController = {
         dataEntrada: dataEntrada || data_entrada || dataAbertura || null,
         dataInicio: dataInicio || dataEntradaInicio || null,
         dataFim: dataFim || dataEntradaFim || null,
+=======
+        tecnicoId: tecnicoId || null,
+        statusId: statusId ? Number(statusId) : null,
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
         pagina: Number(pagina) || 1,
         limite: Number(limite) || 20,
         apenasAtivos: apenasAtivos !== 'false',
@@ -138,6 +152,7 @@ const orderController = {
           ORDER BY nome ASC
         `);
 
+<<<<<<< HEAD
       // 6. Atendentes disponíveis (RF09: usuários com cargo ATENDENTE ou ADMIN)
       const atendentesRes = await pool
         .request()
@@ -158,14 +173,21 @@ const orderController = {
           ORDER BY nome ASC
         `);
 
+=======
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
       return res.status(200).json({
         clientes: clientesRes.recordset,
         equipamentos: equipamentosRes.recordset,
         tecnicos: tecnicosRes.recordset,
+<<<<<<< HEAD
         atendentes: atendentesRes.recordset,
         status: statusRes.recordset,
         produtos: produtosRes.recordset,
         servicos: servicosRes.recordset,
+=======
+        status: statusRes.recordset,
+        produtos: produtosRes.recordset,
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
       });
     } catch (erro) {
       console.error('Erro ao obter auxiliares de OS:', erro);

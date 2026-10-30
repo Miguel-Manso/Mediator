@@ -10,8 +10,11 @@ import {
   ClipboardList,
   Sliders,
   X,
+<<<<<<< HEAD
   BarChart3,
   ShieldAlert,
+=======
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -20,9 +23,13 @@ const itensMenu = [
   { nome: 'Clientes', caminho: '/clientes', icone: Users },
   { nome: 'Equipamentos', caminho: '/equipamentos', icone: Laptop },
   { nome: 'Produtos', caminho: '/produtos', icone: Package },
+<<<<<<< HEAD
   { nome: 'Relatórios', caminho: '/relatorios', icone: BarChart3 },
   { nome: 'Usuários', caminho: '/usuarios', icone: UserCheck, requerAdmin: true },
   { nome: 'Auditoria', caminho: '/auditoria', icone: ShieldAlert, requerAdmin: true },
+=======
+  { nome: 'Usuários', caminho: '/usuarios', icone: UserCheck, requerAdmin: true },
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
 ];
 
 export const Sidebar = ({ aberta, aoFechar }) => {

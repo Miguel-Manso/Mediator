@@ -34,6 +34,7 @@ class OrderModel {
     return `${prefixo}${String(proximoNumero).padStart(4, '0')}`;
   }
 
+<<<<<<< HEAD
   // Listagem com paginação e múltiplos filtros dinâmicos (RF09)
   static async listar({
     clienteId = null,
@@ -54,6 +55,13 @@ class OrderModel {
     dataEntradaInicio = null,
     dataFim = null,
     dataEntradaFim = null,
+=======
+  // Listagem com paginação e múltiplos filtros
+  static async listar({
+    clienteId = null,
+    tecnicoId = null,
+    statusId = null,
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
     busca = '',
     pagina = 1,
     limite = 20,
@@ -68,6 +76,7 @@ class OrderModel {
       whereClause += ' AND os.ativo = 1';
     }
 
+<<<<<<< HEAD
     // Filtro dinâmico por Cliente (RF09: aceita ID, Nome ou CPF)
     const filtroCliente = clienteId || cliente;
     if (filtroCliente && String(filtroCliente).trim() !== '') {
@@ -151,6 +160,21 @@ class OrderModel {
       const dataStr = String(filtroFim).trim().slice(0, 10);
       req.input('dataEntradaFim', sql.NVarChar, dataStr);
       whereClause += ' AND CAST(os.aberto_em AS DATE) <= CAST(@dataEntradaFim AS DATE)';
+=======
+    if (clienteId) {
+      req.input('clienteId', sql.VarChar, clienteId);
+      whereClause += ' AND os.cliente_id = @clienteId';
+    }
+
+    if (tecnicoId) {
+      req.input('tecnicoId', sql.VarChar, tecnicoId);
+      whereClause += ' AND os.tecnico_id = @tecnicoId';
+    }
+
+    if (statusId) {
+      req.input('statusId', sql.Int, Number(statusId));
+      whereClause += ' AND os.status_id = @statusId';
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
     }
 
     if (busca && String(busca).trim() !== '') {
@@ -169,6 +193,7 @@ class OrderModel {
     const countQuery = `
       SELECT COUNT(1) AS total
       FROM ordens_servico os
+<<<<<<< HEAD
       JOIN status_ordem st ON st.id = os.status_id
       JOIN clientes c ON c.id = os.cliente_id
       JOIN equipamentos e ON e.id = os.equipamento_id
@@ -176,6 +201,11 @@ class OrderModel {
       LEFT JOIN modelos m ON m.id = e.modelo_id
       JOIN usuarios ua ON ua.id = os.atendente_id
       LEFT JOIN usuarios ut ON ut.id = os.tecnico_id
+=======
+      JOIN clientes c ON c.id = os.cliente_id
+      JOIN equipamentos e ON e.id = os.equipamento_id
+      LEFT JOIN modelos m ON m.id = e.modelo_id
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
       ${whereClause}
     `;
     const countRes = await req.query(countQuery);

@@ -145,6 +145,7 @@ export const OrderKanbanCard = ({
       />
 
       {/* TOPO: Grip Handle, Número da OS e Data de Abertura */}
+<<<<<<< HEAD
       <div className="flex items-center justify-between gap-2 pl-3 mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
           {/* Grip visual indicador de arrasto */}
@@ -155,40 +156,74 @@ export const OrderKanbanCard = ({
           </span>
           {!os.ativo && (
             <span className="rounded bg-rose-50 border border-rose-200 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-rose-600 shrink-0">
+=======
+      <div className="flex items-center justify-between gap-2 pl-1.5 mb-2">
+        <div className="flex items-center gap-1.5">
+          {/* Grip visual indicador de arrasto */}
+          <GripVertical className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0" />
+
+          <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100/90 px-2 py-0.5 rounded-md border border-slate-200/60">
+            {os.numeroOrdem}
+          </span>
+          {!os.ativo && (
+            <span className="rounded bg-rose-50 border border-rose-200 px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider text-rose-600">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
               Inativa
             </span>
           )}
         </div>
 
+<<<<<<< HEAD
         <div className="flex items-center gap-1 text-[11px] font-medium text-slate-400 shrink-0">
           <Calendar className="h-3 w-3 shrink-0" />
+=======
+        <div className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
+          <Calendar className="h-3 w-3" />
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
           <span>{dataAbertura}</span>
         </div>
       </div>
 
       {/* MEIO: Informações do Cliente e Equipamento */}
+<<<<<<< HEAD
       <div className="space-y-2 pl-3 my-2.5">
+=======
+      <div className="space-y-1.5 pl-1.5 my-2.5">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
         {/* Cliente */}
         <div>
           <p className="text-xs font-semibold text-slate-800 line-clamp-1 group-hover:text-blue-600 transition-colors">
             {os.clienteNome || 'Cliente não identificado'}
           </p>
           {os.clienteTelefone && (
+<<<<<<< HEAD
             <p className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-400 font-medium">
               <Phone className="h-2.5 w-2.5 shrink-0" />
+=======
+            <p className="flex items-center gap-1 text-[10px] text-slate-400 font-medium">
+              <Phone className="h-2.5 w-2.5" />
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
               <span>{os.clienteTelefone}</span>
             </p>
           )}
         </div>
 
         {/* Equipamento */}
+<<<<<<< HEAD
         <div className="flex items-center gap-2 rounded-lg bg-slate-50/80 border border-slate-100 px-2.5 py-1.5 text-slate-700">
+=======
+        <div className="flex items-center gap-1.5 rounded-lg bg-slate-50/80 border border-slate-100 px-2 py-1.5 text-slate-700">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
           <IconeEquipamento className="h-3.5 w-3.5 text-slate-500 shrink-0" />
           <span className="text-[11px] font-medium truncate">
             {os.equipamentoDescricao || 'Equipamento'}
           </span>
           {os.marcaNome && (
+<<<<<<< HEAD
             <span className="ml-auto text-[10px] font-medium text-slate-400 shrink-0 pl-1">
+=======
+            <span className="ml-auto text-[10px] font-medium text-slate-400 shrink-0">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
               {os.marcaNome}
             </span>
           )}
@@ -196,7 +231,11 @@ export const OrderKanbanCard = ({
       </div>
 
       {/* RODAPÉ: Técnico, Valor de Peças, Ações */}
+<<<<<<< HEAD
       <div className="flex items-center justify-between gap-2 border-t border-slate-100/80 pt-2.5 mt-2.5 pl-3">
+=======
+      <div className="flex items-center justify-between border-t border-slate-100/80 pt-2.5 mt-2.5 pl-1.5">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
         {/* Técnico */}
         <div className="flex items-center gap-1.5 min-w-0 pr-2">
           <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">

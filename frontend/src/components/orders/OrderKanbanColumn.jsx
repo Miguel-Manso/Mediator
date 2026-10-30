@@ -146,9 +146,13 @@ export const OrderKanbanColumn = ({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={`flex flex-col ${
+<<<<<<< HEAD
         coluna.isExpandida
           ? 'w-full flex-1 min-w-[280px] sm:min-w-[320px]'
           : 'w-[82vw] max-w-[320px] sm:w-80 shrink-0'
+=======
+        coluna.isExpandida ? 'w-full flex-1 min-w-[320px]' : 'w-80 shrink-0'
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
       } rounded-2xl border transition-all duration-200 max-h-[calc(100vh-230px)] select-none ${
         estaSobreProibido
           ? 'border-rose-400 ring-2 ring-rose-300/60 bg-rose-50/50 shadow-md cursor-not-allowed scale-[1.008]'
@@ -160,7 +164,11 @@ export const OrderKanbanColumn = ({
       }`}
     >
       {/* CABEÇALHO DA COLUNA */}
+<<<<<<< HEAD
       <div className="flex items-center justify-between gap-2 p-3.5 border-b border-slate-200/70 bg-white/70 rounded-t-2xl backdrop-blur-xs">
+=======
+      <div className="flex items-center justify-between p-3 border-b border-slate-200/70 bg-white/70 rounded-t-2xl backdrop-blur-xs">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
         {/* Lado Esquerdo: Tag do Status e Contador */}
         <div className="flex items-center gap-2 min-w-0 pr-1">
           <span
@@ -300,10 +308,17 @@ export const OrderKanbanColumn = ({
 
       {/* ÁREA DE CONTEÚDO DA COLUNA COM SCROLL VERTICAL INDEPENDENTE E DROP ZONES */}
       <div
+<<<<<<< HEAD
         className={`flex-1 overflow-y-auto p-3 min-h-[140px] ${
           coluna.isExpandida
             ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 content-start'
             : 'space-y-3'
+=======
+        className={`flex-1 overflow-y-auto p-2.5 min-h-[140px] ${
+          coluna.isExpandida
+            ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 content-start'
+            : 'space-y-2.5'
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
         }`}
       >
         {totalCards === 0 ? (

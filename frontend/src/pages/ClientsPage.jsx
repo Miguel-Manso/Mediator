@@ -344,6 +344,7 @@ export const ClientsPage = () => {
                           </div>
                         )}
                       </td>
+<<<<<<< HEAD
                        <td className="px-6 py-4 whitespace-nowrap">
                          <span
                            className={`badge ${
@@ -355,6 +356,19 @@ export const ClientsPage = () => {
                        </td>
                        <td className="px-6 py-4 text-right whitespace-nowrap">
                          <div className="flex items-center justify-end gap-2">
+=======
+                      <td className="px-6 py-4">
+                        <span
+                          className={`badge ${
+                            statusAtivo ? 'badge-active' : 'badge-inactive'
+                          }`}
+                        >
+                          {statusAtivo ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                           <button
                             onClick={() => abrirModalEdicao(cliente)}
                             className="p-1.5 text-slate-400 hover:text-slate-700 rounded-md hover:bg-slate-100 transition-colors"
@@ -627,7 +641,11 @@ export const ClientsPage = () => {
                 </div>
               )}
 
+<<<<<<< HEAD
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+=======
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                 <button
                   type="button"
                   onClick={() => setMostrarModal(false)}

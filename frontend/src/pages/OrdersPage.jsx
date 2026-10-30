@@ -32,7 +32,10 @@ import { Pagination } from '../components/common/Pagination';
 import { OrderKanban } from '../components/orders/OrderKanban';
 import { OrderColumnModal } from '../components/orders/OrderColumnModal';
 import { OrderInactivateColumnModal } from '../components/orders/OrderInactivateColumnModal';
+<<<<<<< HEAD
 import { AdvancedFilterPanel } from '../components/orders/AdvancedFilterPanel';
+=======
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
 import { useSocket } from '../contexts/SocketContext';
 
 export const OrdersPage = () => {
@@ -56,6 +59,7 @@ export const OrdersPage = () => {
   const [exibirInativas, setExibirInativas] = useState(false);
   const [exibirColunasInativas, setExibirColunasInativas] = useState(false);
 
+<<<<<<< HEAD
   // Painel de Filtros Avançados Combináveis (RF09)
   const [painelFiltrosAberto, setPainelFiltrosAberto] = useState(false);
   const [filtrosAvancados, setFiltrosAvancados] = useState({
@@ -75,6 +79,8 @@ export const OrdersPage = () => {
     servicos: [],
   });
 
+=======
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
   // Paginação da Tabela
   const [pagina, setPagina] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(1);
@@ -118,13 +124,20 @@ export const OrdersPage = () => {
     }
   };
 
+<<<<<<< HEAD
   // Carrega filtros auxiliares (técnicos, clientes, atendentes, status, servicos)
+=======
+  // Carrega filtros auxiliares (técnicos e status básico)
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
   useEffect(() => {
     const carregarAuxiliares = async () => {
       try {
         const res = await api.get('/ordens-servico/auxiliares');
         setTecnicosLista(res.data.tecnicos || []);
+<<<<<<< HEAD
         setDadosAuxiliares(res.data || {});
+=======
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
       } catch (err) {
         console.error('Erro ao carregar filtros de OS:', err);
       }
@@ -219,6 +232,7 @@ export const OrdersPage = () => {
     };
   }, [socket, usuarioLogado?.id, inscreverReconexao]);
 
+<<<<<<< HEAD
   // Contagem de filtros avançados aplicados (RF09)
   const totalFiltrosAvancadosAtivos = useMemo(() => {
     return Object.values(filtrosAvancados).filter(
@@ -244,6 +258,9 @@ export const OrdersPage = () => {
   };
 
   // Busca ordens com filtros combináveis (RF09)
+=======
+  // Busca ordens com filtros
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
   const buscarOrdens = async () => {
     try {
       setCarregando(true);
@@ -252,6 +269,7 @@ export const OrdersPage = () => {
       if (statusFiltro) params.append('statusId', statusFiltro);
       if (tecnicoFiltro) params.append('tecnicoId', tecnicoFiltro);
 
+<<<<<<< HEAD
       // Filtros avançados combináveis (RF09)
       if (filtrosAvancados.clienteId) params.append('clienteId', filtrosAvancados.clienteId);
       if (filtrosAvancados.tecnicoId) params.append('tecnicoId', filtrosAvancados.tecnicoId);
@@ -261,6 +279,8 @@ export const OrdersPage = () => {
       if (filtrosAvancados.dataInicio) params.append('dataInicio', filtrosAvancados.dataInicio);
       if (filtrosAvancados.dataFim) params.append('dataFim', filtrosAvancados.dataFim);
 
+=======
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
       // No modo Kanban carregamos um limite maior para popular todas as colunas
       if (modoVisualizacao === 'kanban') {
         params.append('limite', '200');
@@ -286,7 +306,11 @@ export const OrdersPage = () => {
 
   useEffect(() => {
     buscarOrdens();
+<<<<<<< HEAD
   }, [busca, statusFiltro, tecnicoFiltro, filtrosAvancados, exibirInativas, pagina, modoVisualizacao]);
+=======
+  }, [busca, statusFiltro, tecnicoFiltro, exibirInativas, pagina, modoVisualizacao]);
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
 
   // Estrutura dinâmica das colunas do Kanban conforme o requisito:
   // Se um status específico for selecionado no dropdown "Todos os status", oculte todas as outras colunas
@@ -579,6 +603,7 @@ export const OrdersPage = () => {
             </button>
           </div>
 
+<<<<<<< HEAD
           {/* Botão de Filtros Avançados (RF09) */}
           <button
             type="button"
@@ -599,6 +624,8 @@ export const OrdersPage = () => {
             )}
           </button>
 
+=======
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
           {/* Botão "+ Nova Coluna / Status" */}
           {podeGerenciarColunas && (
             <button
@@ -689,19 +716,31 @@ export const OrdersPage = () => {
                 setBusca(e.target.value);
                 setPagina(1);
               }}
+<<<<<<< HEAD
               className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-2.5 pl-9 pr-4 text-xs text-slate-800 placeholder-slate-400 transition focus:border-slate-400 focus:bg-white focus:outline-none"
+=======
+              className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-2 pl-9 pr-4 text-xs text-slate-800 placeholder-slate-400 transition focus:border-slate-400 focus:bg-white focus:outline-none"
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
             />
           </div>
 
           {/* Filtro por Status */}
+<<<<<<< HEAD
           <div className="sm:col-span-1 lg:col-span-2">
+=======
+          <div className="sm:col-span-1 lg:col-span-3">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
             <select
               value={statusFiltro}
               onChange={(e) => {
                 setStatusFiltro(e.target.value);
                 setPagina(1);
               }}
+<<<<<<< HEAD
               className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-2.5 px-3 text-xs text-slate-700 transition focus:border-slate-400 focus:bg-white focus:outline-none"
+=======
+              className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-2 px-3 text-xs text-slate-700 transition focus:border-slate-400 focus:bg-white focus:outline-none"
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
             >
               <option value="">Todos os status</option>
               {statusLista.map((st) => (
@@ -720,7 +759,11 @@ export const OrdersPage = () => {
                 setTecnicoFiltro(e.target.value);
                 setPagina(1);
               }}
+<<<<<<< HEAD
               className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-2.5 px-3 text-xs text-slate-700 transition focus:border-slate-400 focus:bg-white focus:outline-none"
+=======
+              className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-2 px-3 text-xs text-slate-700 transition focus:border-slate-400 focus:bg-white focus:outline-none"
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
             >
               <option value="">Todos os técnicos</option>
               {tecnicosLista.map((tec) => (
@@ -732,9 +775,15 @@ export const OrdersPage = () => {
           </div>
 
           {/* Checkboxes de Inativas (OS e Colunas) */}
+<<<<<<< HEAD
           <div className="sm:col-span-2 lg:col-span-4 flex items-center justify-start lg:justify-end gap-2.5 flex-wrap">
             {/* Filtro de Colunas Inativas (destaque especial para o Kanban) */}
             <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600 select-none bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg hover:bg-slate-100 transition shrink-0" title="Exibe etapas que foram desativadas/arquivadas">
+=======
+          <div className="sm:col-span-2 lg:col-span-3 flex items-center justify-start lg:justify-end gap-2 flex-wrap">
+            {/* Filtro de Colunas Inativas (destaque especial para o Kanban) */}
+            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-600 select-none bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition" title="Exibe etapas que foram desativadas/arquivadas">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
               <input
                 type="checkbox"
                 checked={exibirColunasInativas}
@@ -745,7 +794,11 @@ export const OrdersPage = () => {
             </label>
 
             {/* Filtro de Ordens de Serviço Inativas */}
+<<<<<<< HEAD
             <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600 select-none bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg hover:bg-slate-100 transition shrink-0" title="Exibe ordens de serviço arquivadas">
+=======
+            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-600 select-none bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition" title="Exibe ordens de serviço arquivadas">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
               <input
                 type="checkbox"
                 checked={exibirInativas}
@@ -761,6 +814,7 @@ export const OrdersPage = () => {
         </div>
       </div>
 
+<<<<<<< HEAD
       {/* Painel de Filtros Avançados Combináveis (RF09) */}
       <AdvancedFilterPanel
         aberto={painelFiltrosAberto}
@@ -776,6 +830,8 @@ export const OrdersPage = () => {
         totalAtivos={totalFiltrosAvancadosAtivos}
       />
 
+=======
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
       {/* ÁREA PRINCIPAL: KANBAN OU TABELA */}
       {modoVisualizacao === 'kanban' ? (
         <OrderKanban
@@ -837,7 +893,11 @@ export const OrdersPage = () => {
                   {ordens.map((os) => (
                     <tr key={os.id} className="transition-colors hover:bg-slate-50/50">
                       {/* Número da OS */}
+<<<<<<< HEAD
                       <td className="px-5 py-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">
+=======
+                      <td className="px-5 py-3.5 font-mono font-bold text-slate-900">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                         <span className="inline-block rounded bg-slate-100 px-2 py-1 text-slate-800">
                           {os.numeroOrdem}
                         </span>
@@ -858,7 +918,11 @@ export const OrdersPage = () => {
                       </td>
 
                       {/* Status da OS */}
+<<<<<<< HEAD
                       <td className="px-5 py-3.5 whitespace-nowrap">
+=======
+                      <td className="px-5 py-3.5">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                         <span
                           className="inline-flex items-center rounded-md px-2.5 py-1 text-[11px] font-semibold text-white shadow-xs"
                           style={{ backgroundColor: os.statusCor || '#3B82F6' }}
@@ -877,18 +941,31 @@ export const OrdersPage = () => {
                       </td>
 
                       {/* Peças / Subtotal */}
+<<<<<<< HEAD
                       <td className="px-5 py-3.5 text-right font-medium text-slate-900 whitespace-nowrap">
+=======
+                      <td className="px-5 py-3.5 text-right font-medium text-slate-900">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                         {maskCurrency(os.totalProdutos || 0)}
                       </td>
 
                       {/* Abertura */}
+<<<<<<< HEAD
                       <td className="px-5 py-3.5 text-slate-500 text-[11px] whitespace-nowrap">
+=======
+                      <td className="px-5 py-3.5 text-slate-500 text-[11px]">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                         {new Date(os.abertoEm).toLocaleDateString('pt-BR')}
                       </td>
 
                       {/* Ações */}
+<<<<<<< HEAD
                       <td className="px-5 py-3.5 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-2">
+=======
+                      <td className="px-5 py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                           <button
                             onClick={() => abrirDetalhes(os.id)}
                             className="inline-flex items-center gap-1 rounded bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-200"

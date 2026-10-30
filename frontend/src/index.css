@@ -75,6 +75,7 @@
     @apply inline-flex items-center justify-center gap-2 rounded-md bg-slate-800 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 active:translate-y-px;
   }
 
+<<<<<<< HEAD
   .secondary-action {
     @apply inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-medium transition-transform active:translate-y-px disabled:opacity-50;
   }
@@ -83,6 +84,8 @@
     @apply inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
   }
 
+=======
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
   .search-control,
   .form-control {
     @apply border border-slate-300 bg-white text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200;

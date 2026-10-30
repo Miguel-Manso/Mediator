@@ -338,12 +338,20 @@ export const ProductsPage = () => {
                           )}
                         </div>
                       </td>
+<<<<<<< HEAD
                       <td className="px-6 py-4 whitespace-nowrap">
+=======
+                      <td className="px-6 py-4">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                         <span className={`badge ${statusAtivo ? 'badge-active' : 'badge-inactive'}`}>
                           {statusAtivo ? 'Ativo' : 'Inativo'}
                         </span>
                       </td>
+<<<<<<< HEAD
                       <td className="px-6 py-4 text-right whitespace-nowrap">
+=======
+                      <td className="px-6 py-4 text-right">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => abrirModalEdicao(prod)}
@@ -481,7 +489,11 @@ export const ProductsPage = () => {
                 </div>
               )}
 
+<<<<<<< HEAD
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+=======
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                 <button
                   type="button"
                   onClick={() => setMostrarModal(false)}

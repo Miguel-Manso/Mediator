@@ -287,6 +287,7 @@ async function initDatabase() {
       END
     `);
 
+<<<<<<< HEAD
     // 4.1 Tabela de Auditoria (AuditLogs - RF11)
     await activePool.request().query(`
       IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'AuditLogs')
@@ -310,6 +311,8 @@ async function initDatabase() {
       END
     `);
 
+=======
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
     // 5. Tabela de categorias de equipamento (RF03)
     await activePool.request().query(`
       IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'categorias_equipamento')

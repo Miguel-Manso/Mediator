@@ -653,11 +653,19 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
                       </button>
                     )}
 
+<<<<<<< HEAD
                     <div className="flex flex-wrap items-center gap-2">
                       <select
                         value={tecnicoSelecionadoId}
                         onChange={(e) => setTecnicoSelecionadoId(e.target.value)}
                         className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] text-slate-700 focus:outline-none focus:border-slate-400 flex-1 min-w-[140px] sm:max-w-[200px]"
+=======
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={tecnicoSelecionadoId}
+                        onChange={(e) => setTecnicoSelecionadoId(e.target.value)}
+                        className="rounded border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:border-slate-400 flex-1 max-w-[150px]"
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                       >
                         <option value="">(Não atribuído)</option>
                         {tecnicosDisponiveis.map((tec) => (
@@ -671,7 +679,11 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
                           type="button"
                           onClick={() => aoAtribuirTecnico(tecnicoSelecionadoId)}
                           disabled={salvandoTecnico}
+<<<<<<< HEAD
                           className="rounded-lg bg-slate-800 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-slate-700 disabled:opacity-50 shrink-0"
+=======
+                          className="rounded bg-slate-800 px-2 py-1 text-[10px] font-bold text-white hover:bg-slate-700 disabled:opacity-50"
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                           title="Salvar alteração de técnico"
                         >
                           {salvandoTecnico ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Salvar'}
@@ -684,43 +696,71 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
             </div>
 
             {/* Abas de Navegação Responsivas */}
+<<<<<<< HEAD
             <div className="flex overflow-x-auto border-b border-slate-200 gap-1">
               <button
                 type="button"
                 onClick={() => setAbaAtiva('triagem')}
                 className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap shrink-0 transition ${
+=======
+            <div className="flex overflow-x-auto border-b border-slate-200">
+              <button
+                type="button"
+                onClick={() => setAbaAtiva('triagem')}
+                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition ${
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                   abaAtiva === 'triagem'
                     ? 'border-slate-900 text-slate-900'
                     : 'border-transparent text-slate-400 hover:text-slate-700'
                 }`}
               >
+<<<<<<< HEAD
                 <FileText className="h-4 w-4 shrink-0" />
+=======
+                <FileText className="h-4 w-4" />
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                 Geral e Laudo
               </button>
 
               <button
                 type="button"
                 onClick={() => setAbaAtiva('evolucao')}
+<<<<<<< HEAD
                 className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap shrink-0 transition ${
+=======
+                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition ${
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                   abaAtiva === 'evolucao'
                     ? 'border-slate-900 text-slate-900'
                     : 'border-transparent text-slate-400 hover:text-slate-700'
                 }`}
               >
+<<<<<<< HEAD
                 <History className="h-4 w-4 shrink-0" />
+=======
+                <History className="h-4 w-4" />
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                 Evolução Técnica ({ordem.historico?.length || 0})
               </button>
 
               <button
                 type="button"
                 onClick={() => setAbaAtiva('pecas')}
+<<<<<<< HEAD
                 className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap shrink-0 transition ${
+=======
+                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition ${
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                   abaAtiva === 'pecas'
                     ? 'border-slate-900 text-slate-900'
                     : 'border-transparent text-slate-400 hover:text-slate-700'
                 }`}
               >
+<<<<<<< HEAD
                 <Package className="h-4 w-4 shrink-0" />
+=======
+                <Package className="h-4 w-4" />
+>>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
                 Peças ({ordem.itens?.length || 0})
               </button>
             </div>

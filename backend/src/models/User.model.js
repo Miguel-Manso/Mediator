@@ -1,0 +1,306 @@
+const { getPool, sql } = require('../config/db');
+const AddressModel = require('./Address.model');
+
+class UserModel {
+  static async findAll({ apenasAtivos = true, busca = '' } = {}) {
+    const pool = await getPool();
+    const req = pool.request();
+    let query = `
+      SELECT 
+        u.id, 
+        u.nome, 
+        u.email, 
+        u.cpf,
+        u.cargo, 
+        u.status, 
+        u.ativo,
+        u.telefone, 
+        COALESCE(e.cidade, 'Viradouro') AS cidade, 
+        ue.endereco_id AS enderecoId,
+        u.criado_em AS criadoEm,
+        u.atualizado_em AS atualizadoEm,
+        u.nome AS name,
+        u.cargo AS role,
+        u.telefone AS phone,
+        COALESCE(e.cidade, 'Viradouro') AS city,
+        u.criado_em AS createdAt,
+        u.atualizado_em AS updatedAt,
+        e.logradouro,
+        e.numero,
+        e.complemento,
+        e.bairro,
+        COALESCE(e.cidade, 'Viradouro') AS enderecoCidade,
+        e.cep,
+        e.uf
+      FROM usuarios u
+      OUTER APPLY (
+        SELECT TOP 1 ue_sub.endereco_id, ue_sub.tipo, ue_sub.principal
+        FROM usuario_enderecos ue_sub
+        WHERE ue_sub.usuario_id = u.id AND ue_sub.ativo = 1
+        ORDER BY ue_sub.principal DESC, ue_sub.criado_em DESC
+      ) ue
+      LEFT JOIN enderecos e ON ue.endereco_id = e.id
+      WHERE 1=1
+    `;
+
+    if (apenasAtivos) {
+      query += ' AND u.ativo = 1';
+    }
+
+    if (busca && String(busca).trim() !== '') {
+      req.input('busca', sql.NVarChar, `%${String(busca).trim()}%`);
+      query += ' AND (u.nome LIKE @busca OR u.email LIKE @busca OR u.cpf LIKE @busca)';
+    }
+
+    query += ' ORDER BY u.nome ASC';
+
+    const result = await req.query(query);
+    return result.recordset;
+  }
+
+  static async findById(id) {
+    if (!id) return null;
+    const pool = await getPool();
+    const result = await pool
+      .request()
+      .input('id', sql.VarChar, id)
+      .query(`
+        SELECT 
+          u.id, 
+          u.nome, 
+          u.email, 
+          u.cpf,
+          u.senha_hash, 
+          u.cargo, 
+          u.status, 
+          u.ativo,
+          u.telefone, 
+          COALESCE(e.cidade, 'Viradouro') AS cidade, 
+          ue.endereco_id AS enderecoId,
+          u.criado_em AS criadoEm,
+          u.atualizado_em AS atualizadoEm,
+          u.nome AS name,
+          u.cargo AS role,
+          u.telefone AS phone,
+          COALESCE(e.cidade, 'Viradouro') AS city,
+          u.criado_em AS createdAt,
+          u.atualizado_em AS updatedAt,
+          e.logradouro,
+          e.numero,
+          e.complemento,
+          e.bairro,
+          COALESCE(e.cidade, 'Viradouro') AS enderecoCidade,
+          e.cep,
+          e.uf
+        FROM usuarios u
+        OUTER APPLY (
+          SELECT TOP 1 ue_sub.endereco_id, ue_sub.tipo, ue_sub.principal
+          FROM usuario_enderecos ue_sub
+          WHERE ue_sub.usuario_id = u.id AND ue_sub.ativo = 1
+          ORDER BY ue_sub.principal DESC, ue_sub.criado_em DESC
+        ) ue
+        LEFT JOIN enderecos e ON ue.endereco_id = e.id
+        WHERE u.id = @id
+      `);
+
+    const usuario = result.recordset[0] || null;
+    if (usuario) {
+      usuario.enderecos = await AddressModel.findByUsuarioId(id);
+    }
+    return usuario;
+  }
+
+  static async findByEmail(email) {
+    if (!email) return null;
+    const pool = await getPool();
+    const result = await pool
+      .request()
+      .input('email', sql.NVarChar, String(email).trim().toLowerCase())
+      .query(`
+        SELECT 
+          u.id, u.nome, u.email, u.cpf, u.senha_hash, u.cargo, u.status, u.ativo, u.telefone, 
+          COALESCE(e.cidade, 'Viradouro') AS cidade, ue.endereco_id AS enderecoId
+        FROM usuarios u
+        OUTER APPLY (
+          SELECT TOP 1 ue_sub.endereco_id, ue_sub.tipo, ue_sub.principal
+          FROM usuario_enderecos ue_sub
+          WHERE ue_sub.usuario_id = u.id AND ue_sub.ativo = 1
+          ORDER BY ue_sub.principal DESC, ue_sub.criado_em DESC
+        ) ue
+        LEFT JOIN enderecos e ON ue.endereco_id = e.id
+        WHERE LOWER(u.email) = @email
+      `);
+
+    return result.recordset[0] || null;
+  }
+
+  static async checkEmailExists(email, excludeId = null) {
+    if (!email) return false;
+    const pool = await getPool();
+    const req = pool.request().input('email', sql.NVarChar, String(email).trim().toLowerCase());
+
+    let query = 'SELECT id FROM usuarios WHERE LOWER(email) = @email';
+    if (excludeId) {
+      req.input('excludeId', sql.VarChar, excludeId);
+      query += ' AND id != @excludeId';
+    }
+
+    const result = await req.query(query);
+    return result.recordset.length > 0;
+  }
+
+  static async checkCpfExists(cpf, excludeId = null) {
+    if (!cpf) return false;
+    const pool = await getPool();
+    const req = pool.request().input('cpf', sql.NVarChar, String(cpf).trim());
+
+    let query = 'SELECT id FROM usuarios WHERE cpf = @cpf';
+    if (excludeId) {
+      req.input('excludeId', sql.VarChar, excludeId);
+      query += ' AND id != @excludeId';
+    }
+
+    const result = await req.query(query);
+    return result.recordset.length > 0;
+  }
+
+  static async create({
+    nome,
+    email,
+    cpf = null,
+    senhaHash,
+    cargo = 'ATENDENTE',
+    telefone = null,
+    enderecoId = null,
+  }) {
+    const pool = await getPool();
+    const result = await pool
+      .request()
+      .input('nome', sql.NVarChar, String(nome).trim())
+      .input('email', sql.NVarChar, String(email).trim().toLowerCase())
+      .input('cpf', sql.NVarChar, cpf ? String(cpf).trim() : null)
+      .input('senha_hash', sql.NVarChar, senhaHash)
+      .input('cargo', sql.NVarChar, String(cargo).toUpperCase())
+      .input('telefone', telefone ? String(telefone).trim() : null)
+      .query(`
+        INSERT INTO usuarios (id, nome, email, cpf, senha_hash, cargo, status, ativo, telefone)
+        OUTPUT 
+          inserted.id, inserted.nome, inserted.email, inserted.cpf, inserted.cargo, 
+          inserted.status, inserted.ativo, inserted.telefone, 
+          inserted.criado_em AS criadoEm, 
+          inserted.atualizado_em AS atualizadoEm
+        VALUES (LOWER(NEWID()), @nome, @email, @cpf, @senha_hash, @cargo, 'ATIVO', 1, @telefone)
+      `);
+
+    const user = result.recordset[0];
+
+    // Se enderecoId foi informado, vincula na tabela intermediária N:N
+    if (enderecoId) {
+      await AddressModel.vincularUsuario(user.id, enderecoId, { tipo: 'PRINCIPAL', principal: 1 });
+    }
+
+    return {
+      ...user,
+      enderecoId: enderecoId || null,
+      name: user.nome,
+      role: user.cargo,
+      phone: user.telefone,
+      createdAt: user.criadoEm,
+      updatedAt: user.atualizadoEm,
+    };
+  }
+
+  static async update(id, dados) {
+    if (!id) return null;
+    const pool = await getPool();
+    const req = pool.request();
+    let query = 'UPDATE usuarios SET atualizado_em = GETDATE()';
+
+    if (dados.nome !== undefined) {
+      query += ', nome = @nome';
+      req.input('nome', sql.NVarChar, String(dados.nome).trim());
+    }
+    if (dados.email !== undefined) {
+      query += ', email = @email';
+      req.input('email', sql.NVarChar, String(dados.email).trim().toLowerCase());
+    }
+    if (dados.cpf !== undefined) {
+      query += ', cpf = @cpf';
+      req.input('cpf', sql.NVarChar, dados.cpf ? String(dados.cpf).trim() : null);
+    }
+    if (dados.senhaHash !== undefined) {
+      query += ', senha_hash = @senha_hash';
+      req.input('senha_hash', sql.NVarChar, dados.senhaHash);
+    }
+    if (dados.cargo !== undefined) {
+      query += ', cargo = @cargo';
+      req.input('cargo', sql.NVarChar, String(dados.cargo).toUpperCase());
+    }
+    if (dados.status !== undefined) {
+      query += ', status = @status';
+      req.input('status', sql.NVarChar, dados.status);
+    }
+    if (dados.ativo !== undefined) {
+      query += ', ativo = @ativo';
+      req.input('ativo', sql.Bit, dados.ativo ? 1 : 0);
+    } else if (dados.status !== undefined) {
+      query += ', ativo = @ativo_calc';
+      req.input('ativo_calc', sql.Bit, dados.status === 'ATIVO' ? 1 : 0);
+    }
+    if (dados.telefone !== undefined) {
+      query += ', telefone = @telefone';
+      req.input('telefone', sql.NVarChar, dados.telefone ? String(dados.telefone).trim() : null);
+    }
+
+    query += `
+      OUTPUT 
+        inserted.id, inserted.nome, inserted.email, inserted.cpf, inserted.cargo, 
+        inserted.status, inserted.ativo, inserted.telefone, 
+        inserted.criado_em AS criadoEm, 
+        inserted.atualizado_em AS atualizadoEm
+      WHERE id = @id
+    `;
+    req.input('id', sql.VarChar, id);
+
+    const result = await req.query(query);
+    const user = result.recordset[0];
+    if (!user) return null;
+
+    if (dados.enderecoId !== undefined) {
+      if (dados.enderecoId) {
+        await AddressModel.vincularUsuario(id, dados.enderecoId, { tipo: 'PRINCIPAL', principal: 1 });
+      }
+    }
+
+    return {
+      ...user,
+      enderecoId: dados.enderecoId !== undefined ? dados.enderecoId : undefined,
+      name: user.nome,
+      role: user.cargo,
+      phone: user.telefone,
+      createdAt: user.criadoEm,
+      updatedAt: user.atualizadoEm,
+    };
+  }
+
+  // Soft delete obrigatorio: Proibido DELETE fisico
+  static async softDelete(id) {
+    if (!id) return null;
+    const pool = await getPool();
+    const result = await pool
+      .request()
+      .input('id', sql.VarChar, id)
+      .query(`
+        UPDATE usuarios 
+        SET status = 'INATIVO', ativo = 0, atualizado_em = GETDATE()
+        OUTPUT 
+          inserted.id, inserted.nome, inserted.email, inserted.cargo, 
+          inserted.status, inserted.ativo, inserted.atualizado_em AS atualizadoEm
+        WHERE id = @id
+      `);
+
+    return result.recordset[0] || null;
+  }
+}
+
+module.exports = UserModel;

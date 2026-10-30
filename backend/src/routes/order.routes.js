@@ -1,7 +1,6 @@
 const { Router } = require('express');
 const orderController = require('../controllers/order.controller');
 const roleMiddleware = require('../middlewares/role.middleware');
-<<<<<<< HEAD
 const auditMiddleware = require('../middlewares/audit.middleware');
 
 const router = Router();
@@ -9,11 +8,6 @@ const router = Router();
 // Middleware de Auditoria (RF11) para capturar POST, PUT, DELETE e PATCH nas OS
 router.use(auditMiddleware);
 
-=======
-
-const router = Router();
-
->>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
 // Rota auxiliar para combos de abertura e filtros (visível para todos autenticados)
 router.get('/auxiliares', orderController.obterAuxiliaresAbertura);
 

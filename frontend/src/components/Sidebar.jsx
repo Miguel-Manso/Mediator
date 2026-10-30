@@ -10,11 +10,8 @@ import {
   ClipboardList,
   Sliders,
   X,
-<<<<<<< HEAD
   BarChart3,
   ShieldAlert,
-=======
->>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -23,13 +20,9 @@ const itensMenu = [
   { nome: 'Clientes', caminho: '/clientes', icone: Users },
   { nome: 'Equipamentos', caminho: '/equipamentos', icone: Laptop },
   { nome: 'Produtos', caminho: '/produtos', icone: Package },
-<<<<<<< HEAD
   { nome: 'Relatórios', caminho: '/relatorios', icone: BarChart3 },
   { nome: 'Usuários', caminho: '/usuarios', icone: UserCheck, requerAdmin: true },
   { nome: 'Auditoria', caminho: '/auditoria', icone: ShieldAlert, requerAdmin: true },
-=======
-  { nome: 'Usuários', caminho: '/usuarios', icone: UserCheck, requerAdmin: true },
->>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
 ];
 
 export const Sidebar = ({ aberta, aoFechar }) => {
@@ -48,7 +41,7 @@ export const Sidebar = ({ aberta, aoFechar }) => {
       {/* Backdrop para mobile */}
       {aberta && (
         <div
-          className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm transition-opacity md:hidden"
+          className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm transition-opacity md:hidden print:hidden"
           onClick={aoFechar}
           aria-hidden="true"
         />
@@ -56,7 +49,7 @@ export const Sidebar = ({ aberta, aoFechar }) => {
 
       {/* Menu Lateral (Drawer no Mobile / Fixo no Desktop) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-full w-64 flex-col justify-between border-r border-slate-200 bg-white p-4 transition-transform duration-200 ease-in-out md:static md:h-screen md:w-60 md:flex-shrink-0 md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-full w-64 flex-col justify-between border-r border-slate-200 bg-white p-4 transition-transform duration-200 ease-in-out md:static md:h-screen md:w-60 md:flex-shrink-0 md:translate-x-0 print:hidden ${
           aberta ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
         }`}
       >

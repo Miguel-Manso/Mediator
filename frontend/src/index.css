@@ -75,7 +75,6 @@
     @apply inline-flex items-center justify-center gap-2 rounded-md bg-slate-800 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 active:translate-y-px;
   }
 
-<<<<<<< HEAD
   .secondary-action {
     @apply inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-medium transition-transform active:translate-y-px disabled:opacity-50;
   }
@@ -84,8 +83,6 @@
     @apply inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
   }
 
-=======
->>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
   .search-control,
   .form-control {
     @apply border border-slate-300 bg-white text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200;
@@ -117,5 +114,66 @@
 
   .modal-panel {
     @apply max-h-[90vh] w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.14)];
+  }
+}
+
+
+/* Regras Globais de Impressão (Paginação sem corte de conteúdo) */
+@media print {
+  @page {
+    margin: 12mm 10mm;
+    size: auto;
+  }
+
+  html,
+  body,
+  #root {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  .print\:hidden,
+  aside,
+  header,
+  nav {
+    display: none !important;
+  }
+
+  main,
+  div {
+    max-height: none !important;
+  }
+
+  main {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .print-avoid-break,
+  .print\:break-inside-avoid {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  thead {
+    display: table-header-group !important;
   }
 }

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { maskCurrency } from '../utils/masks';
+import { SearchableCombobox } from '../components/common/SearchableCombobox';
 
 export const ReportsPage = () => {
   // Parâmetros de Filtro
@@ -138,9 +139,31 @@ export const ReportsPage = () => {
     }
   };
 
-  const imprimirRelatorio = () => {
-    window.print();
+  // Expande todos os registros automaticamente antes de imprimir
+  const prepararImpressao = () => {
+    const novos = {};
+    (relatorio?.grupos || []).forEach((_, idx) => {
+      novos[idx] = true;
+    });
+    setItensExpandidos(novos);
   };
+
+  const imprimirRelatorio = () => {
+    prepararImpressao();
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
+
+  useEffect(() => {
+    const handleBeforePrint = () => {
+      prepararImpressao();
+    };
+    window.addEventListener('beforeprint', handleBeforePrint);
+    return () => {
+      window.removeEventListener('beforeprint', handleBeforePrint);
+    };
+  }, [relatorio]);
 
   const resumo = relatorio?.resumo || {};
   const grupos = relatorio?.grupos || [];
@@ -162,11 +185,11 @@ export const ReportsPage = () => {
             <BarChart3 className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 print:text-xl">
               Relatório Operacional Master-Detail
             </h1>
-            <p className="text-xs text-slate-500">
-              Cruzamento consolidado de dados entre Clientes, Técnicos e Ordens de Serviço (RF12)
+            <p className="text-[11px] text-slate-500 hidden print:block mt-0.5">
+              Emitido em: {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • Sistema Mediator
             </p>
           </div>
         </div>
@@ -237,64 +260,61 @@ export const ReportsPage = () => {
 
         {/* 2. Filtros Específicos */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 items-end pt-1">
-          {/* Cliente */}
+          {/* Cliente com Busca Otimizada */}
           <div>
             <label className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
               <User className="h-3 w-3 text-slate-400" />
               Filtrar Cliente
             </label>
-            <select
+            <SearchableCombobox
               value={clienteId}
-              onChange={(e) => setClienteId(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-1.5 px-2.5 text-xs text-slate-700 transition focus:border-slate-400 focus:bg-white focus:outline-none"
-            >
-              <option value="">Todos os clientes</option>
-              {(auxiliares.clientes || []).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                </option>
-              ))}
-            </select>
+              onChange={setClienteId}
+              options={auxiliares.clientes || []}
+              valueKey="id"
+              labelKey="nome"
+              sublabelKey="cpf"
+              placeholder="Todos os clientes"
+              searchPlaceholder="Buscar por nome ou CPF..."
+              icon={User}
+            />
           </div>
 
-          {/* Técnico */}
+          {/* Técnico com Busca Otimizada */}
           <div>
             <label className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
               <Wrench className="h-3 w-3 text-slate-400" />
               Filtrar Técnico
             </label>
-            <select
+            <SearchableCombobox
               value={tecnicoId}
-              onChange={(e) => setTecnicoId(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-1.5 px-2.5 text-xs text-slate-700 transition focus:border-slate-400 focus:bg-white focus:outline-none"
-            >
-              <option value="">Todos os técnicos</option>
-              {(auxiliares.tecnicos || []).map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.nome}
-                </option>
-              ))}
-            </select>
+              onChange={setTecnicoId}
+              options={auxiliares.tecnicos || []}
+              valueKey="id"
+              labelKey="nome"
+              sublabelKey="email"
+              placeholder="Todos os técnicos"
+              searchPlaceholder="Buscar técnico..."
+              icon={Wrench}
+            />
           </div>
 
-          {/* Status */}
+          {/* Status com Busca Otimizada */}
           <div>
             <label className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
               <CheckCircle2 className="h-3 w-3 text-slate-400" />
               Status
             </label>
-            <select
+            <SearchableCombobox
               value={statusId}
-              onChange={(e) => setStatusId(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-1.5 px-2.5 text-xs text-slate-700 transition focus:border-slate-400 focus:bg-white focus:outline-none"
-            >
-              <option value="">Todos os status</option>
-              {(auxiliares.status || []).map((st) => (
-                <option key={st.id} value={st.id}>
-                  {st.nome}
-                </option>
-              ))}
-            </select>
+              onChange={setStatusId}
+              options={auxiliares.status || []}
+              valueKey="id"
+              labelKey="nome"
+              corKey="cor"
+              placeholder="Todos os status"
+              searchPlaceholder="Buscar status..."
+              icon={CheckCircle2}
+            />
           </div>
 
           {/* Período: Início */}
@@ -438,7 +458,7 @@ export const ReportsPage = () => {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 print:space-y-4 print:overflow-visible">
             {grupos.map((grupo, idx) => {
               const master = grupo.master || {};
               const detalhes = grupo.detalhes || [];
@@ -447,7 +467,7 @@ export const ReportsPage = () => {
               return (
                 <div
                   key={idx}
-                  className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs transition"
+                  className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs transition print:overflow-visible print:shadow-none print:break-inside-avoid print:border-slate-300 print:mb-4"
                 >
                   {/* Cabeçalho Master */}
                   <div
@@ -499,7 +519,7 @@ export const ReportsPage = () => {
 
                   {/* Tabela de Detalhes (Detail) */}
                   {estaExpandido && (
-                    <div className="overflow-x-auto p-0">
+                    <div className="overflow-x-auto p-0 print:overflow-visible">
                       <table className="w-full text-left text-xs text-slate-600">
                         <thead className="bg-slate-100/60 text-[10px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
                           <tr>

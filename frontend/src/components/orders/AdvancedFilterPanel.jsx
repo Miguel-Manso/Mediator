@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   X,
 } from 'lucide-react';
+import { SearchableCombobox } from '../common/SearchableCombobox';
 
 export const AdvancedFilterPanel = ({
   aberto,
@@ -74,67 +75,59 @@ export const AdvancedFilterPanel = ({
       </div>
 
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-12 items-end">
-        {/* 1. Cliente */}
+        {/* 1. Cliente com Busca Otimizada */}
         <div className="xl:col-span-2">
           <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
             <User className="h-3 w-3 text-slate-400 shrink-0" />
             Cliente
           </label>
-          <select
+          <SearchableCombobox
             value={filtros.clienteId || ''}
-            onChange={(e) => onChange('clienteId', e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="w-full rounded-lg border border-slate-200 bg-white py-2 px-2.5 text-xs text-slate-700 transition focus:border-slate-400 focus:outline-none"
-          >
-            <option value="">Todos os clientes</option>
-            {clientes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nome} {c.cpf ? `(${c.cpf})` : ''}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => onChange('clienteId', val)}
+            options={clientes}
+            valueKey="id"
+            labelKey="nome"
+            sublabelKey="cpf"
+            placeholder="Todos os clientes"
+            searchPlaceholder="Buscar por nome ou CPF..."
+            icon={User}
+          />
         </div>
 
-        {/* 2. Técnico */}
+        {/* 2. Técnico com Busca Otimizada */}
         <div className="xl:col-span-2">
           <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
             <Wrench className="h-3 w-3 text-slate-400 shrink-0" />
             Técnico
           </label>
-          <select
+          <SearchableCombobox
             value={filtros.tecnicoId || ''}
-            onChange={(e) => onChange('tecnicoId', e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="w-full rounded-lg border border-slate-200 bg-white py-2 px-2.5 text-xs text-slate-700 transition focus:border-slate-400 focus:outline-none"
-          >
-            <option value="">Todos os técnicos</option>
-            {tecnicos.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.nome}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => onChange('tecnicoId', val)}
+            options={tecnicos}
+            valueKey="id"
+            labelKey="nome"
+            placeholder="Todos os técnicos"
+            searchPlaceholder="Buscar técnico..."
+            icon={Wrench}
+          />
         </div>
 
-        {/* 3. Atendente */}
+        {/* 3. Atendente com Busca Otimizada */}
         <div className="xl:col-span-2">
           <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
             <UserCheck className="h-3 w-3 text-slate-400 shrink-0" />
             Atendente
           </label>
-          <select
+          <SearchableCombobox
             value={filtros.atendenteId || ''}
-            onChange={(e) => onChange('atendenteId', e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="w-full rounded-lg border border-slate-200 bg-white py-2 px-2.5 text-xs text-slate-700 transition focus:border-slate-400 focus:outline-none"
-          >
-            <option value="">Todos os atendentes</option>
-            {atendentes.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.nome}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => onChange('atendenteId', val)}
+            options={atendentes}
+            valueKey="id"
+            labelKey="nome"
+            placeholder="Todos os atendentes"
+            searchPlaceholder="Buscar atendente..."
+            icon={UserCheck}
+          />
         </div>
 
         {/* 4. Tipo de Serviço / Reparo */}
@@ -166,25 +159,24 @@ export const AdvancedFilterPanel = ({
           </datalist>
         </div>
 
-        {/* 5. Status da OS */}
+        {/* 5. Status da OS com Busca Otimizada e Cor */}
         <div className="xl:col-span-2">
           <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
             <CheckCircle2 className="h-3 w-3 text-slate-400 shrink-0" />
             Status da OS
           </label>
-          <select
+          <SearchableCombobox
             value={filtros.statusId || ''}
-            onChange={(e) => onChange('statusId', e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="w-full rounded-lg border border-slate-200 bg-white py-2 px-2.5 text-xs text-slate-700 transition focus:border-slate-400 focus:outline-none"
-          >
-            <option value="">Todos os status</option>
-            {status.map((st) => (
-              <option key={st.id} value={st.id}>
-                {st.ordem ? `${st.ordem}. ` : ''}{st.nome}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => onChange('statusId', val)}
+            options={status}
+            valueKey="id"
+            labelKey="nome"
+            corKey="cor"
+            formatLabel={(st) => `${st.ordem ? `${st.ordem}. ` : ''}${st.nome}`}
+            placeholder="Todos os status"
+            searchPlaceholder="Buscar status..."
+            icon={CheckCircle2}
+          />
         </div>
 
         {/* 6. Período de Entrada (Início / Fim) */}

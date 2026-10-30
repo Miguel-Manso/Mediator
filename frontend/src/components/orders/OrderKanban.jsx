@@ -210,11 +210,7 @@ export const OrderKanban = ({
   return (
     <div className="relative">
       {/* ESTEIRA DO KANBAN: EXPANDIDA EM COLUNA ÚNICA OU SCROLL HORIZONTAL MULTI-COLUNAS */}
-<<<<<<< HEAD
       <div className={`flex items-start gap-4 pb-5 pt-1.5 px-1.5 ${ehUnicaColuna ? 'w-full' : 'overflow-x-auto scroll-smooth'}`}>
-=======
-      <div className={`flex items-start gap-4 pb-4 pt-1 px-1 ${ehUnicaColuna ? 'w-full' : 'overflow-x-auto scroll-smooth'}`}>
->>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
         {colunasLocais.map((coluna, index) => (
           <OrderKanbanColumn
             key={coluna.id}
@@ -242,11 +238,7 @@ export const OrderKanban = ({
 
         {/* BOTÃO "+ ADICIONAR COLUNA" NO FINAL DA ESTEIRA (apenas no modo geral com todas as colunas) */}
         {podeGerenciar && !ehUnicaColuna && (
-<<<<<<< HEAD
           <div className="shrink-0 w-72 sm:w-80">
-=======
-          <div className="shrink-0 w-72">
->>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
             <button
               type="button"
               onClick={aoAdicionarColuna}

@@ -8,11 +8,8 @@ const equipmentRoutes = require('./equipment.routes');
 const productRoutes = require('./product.routes');
 const orderStatusRoutes = require('./orderStatus.routes');
 const orderRoutes = require('./order.routes');
-<<<<<<< HEAD
 const auditRoutes = require('./audit.routes');
 const reportRoutes = require('./report.routes');
-=======
->>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
 
 const routes = Router();
 
@@ -40,11 +37,7 @@ routes.use('/products', authMiddleware, productRoutes);
 routes.use('/status-ordem', authMiddleware, orderStatusRoutes);
 routes.use('/order-statuses', authMiddleware, orderStatusRoutes);
 
-<<<<<<< HEAD
 // Rotas de Ordens de Servico (RF06, RF09 e RF11 com auditoria)
-=======
-// Rotas de Ordens de Servico (RF06)
->>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
 routes.use('/ordens-servico', authMiddleware, orderRoutes);
 routes.use('/orders', authMiddleware, orderRoutes);
 
@@ -52,7 +45,6 @@ routes.use('/orders', authMiddleware, orderRoutes);
 routes.use('/usuarios', authMiddleware, roleMiddleware(['ADMIN']), userRoutes);
 routes.use('/users', authMiddleware, roleMiddleware(['ADMIN']), userRoutes);
 
-<<<<<<< HEAD
 // Rotas de Auditoria (RF11): ACESSO EXCLUSIVO PARA ADMIN
 routes.use('/auditoria', authMiddleware, auditRoutes);
 routes.use('/audit-logs', authMiddleware, auditRoutes);
@@ -61,7 +53,5 @@ routes.use('/audit-logs', authMiddleware, auditRoutes);
 routes.use('/relatorios', authMiddleware, reportRoutes);
 routes.use('/reports', authMiddleware, reportRoutes);
 
-=======
->>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
 module.exports = routes;
 

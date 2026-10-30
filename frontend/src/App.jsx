@@ -9,11 +9,8 @@ import { EquipmentsPage } from './pages/EquipmentsPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { UsersPage } from './pages/UsersPage';
 import { OrdersPage } from './pages/OrdersPage';
-<<<<<<< HEAD
 import { AuditLogsPage } from './pages/AuditLogsPage';
 import { ReportsPage } from './pages/ReportsPage';
-=======
->>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
 
 const RotaPrivada = ({ children }) => {
   const { autenticado, isAuthenticated, carregando, loading } = useAuth();
@@ -93,7 +90,6 @@ export const App = () => {
                 }
               />
 
-<<<<<<< HEAD
               {/* Relatórios Operacionais Master-Detail (RF12) */}
               <Route path="relatorios" element={<ReportsPage />} />
               <Route path="reports" element={<Navigate to="/relatorios" replace />} />
@@ -109,8 +105,6 @@ export const App = () => {
               />
               <Route path="audit-logs" element={<Navigate to="/auditoria" replace />} />
 
-=======
->>>>>>> db487ae2b8afd00805ef06ab93dea14cdd63002a
               {/* Redirecionamentos para compatibilidade */}
               <Route path="clients" element={<Navigate to="/clientes" replace />} />
               <Route path="equipments" element={<Navigate to="/equipamentos" replace />} />

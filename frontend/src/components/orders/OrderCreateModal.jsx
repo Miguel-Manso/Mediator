@@ -17,6 +17,8 @@ import {
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { EquipmentSearchModal } from '../common/EquipmentSearchModal';
+import { ClientSearchModal } from '../common/ClientSearchModal';
+import { SearchableCombobox } from '../common/SearchableCombobox';
 
 const TIPOS_REPARO = [
   {
@@ -263,6 +265,19 @@ export const OrderCreateModal = ({ aberto, aoFechar, aoSucesso }) => {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const [modalPesquisaEquipamento, setModalPesquisaEquipamento] = useState(false);
+  const [modalPesquisaCliente, setModalPesquisaCliente] = useState(false);
+
+  const handleSelecionarClientePesquisa = (cli) => {
+    if (cli) {
+      setClientes((prev) => {
+        if (!prev.some((c) => String(c.id) === String(cli.id))) {
+          return [cli, ...prev];
+        }
+        return prev;
+      });
+      aoMudarCliente(cli.id);
+    }
+  };
 
   const clienteSelecionado = clientes.find((c) => String(c.id) === String(clienteId));
 

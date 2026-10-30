@@ -2,7 +2,9 @@ USE mediator_db;
 GO
 
 -- =========================================================================
--- CARGA DE DADOS EM MASSA (MOCK): 100 PRODUTOS, 100 CLIENTES, 100 EQUIPAMENTOS
+-- CARGA DE DADOS EM MASSA (MOCK): 
+-- 100 PRODUTOS, 100 CLIENTES, 100 EQUIPAMENTOS, 60 ORDENS DE SERVIÇO,
+-- ITENS DE PEÇAS, HISTÓRICO E LOGS DE AUDITORIA (RF06, RF09, RF11, RF12)
 -- =========================================================================
 
 PRINT 'Iniciando carga em massa de 100 Produtos...';
@@ -68,4 +70,561 @@ FROM clientes
 WHERE email LIKE '%@mediator.mock.com';
 
 PRINT '100 Equipamentos inseridos com sucesso.';
+GO
+
+-- =========================================================================
+-- CARGA DE ORDENS DE SERVIÇO EM MASSA (60 OSs com status, técnicos e peças)
+-- =========================================================================
+PRINT 'Iniciando carga de 60 Ordens de Serviço (RF06, RF09 e RF12)...';
+
+DECLARE @adminId VARCHAR(36) = (SELECT TOP 1 id FROM usuarios WHERE email = 'admin@mediator.com');
+DECLARE @atendenteId VARCHAR(36) = (SELECT TOP 1 id FROM usuarios WHERE email = 'ana@mediator.com');
+DECLARE @tecnicoId VARCHAR(36) = (SELECT TOP 1 id FROM usuarios WHERE email = 'carlos@mediator.com');
+
+-- Caso usuários padrão não existam com esses emails, pega por cargo
+IF @adminId IS NULL SET @adminId = (SELECT TOP 1 id FROM usuarios WHERE cargo = 'ADMIN');
+IF @atendenteId IS NULL SET @atendenteId = (SELECT TOP 1 id FROM usuarios WHERE cargo = 'ATENDENTE');
+IF @atendenteId IS NULL SET @atendenteId = @adminId;
+IF @tecnicoId IS NULL SET @tecnicoId = (SELECT TOP 1 id FROM usuarios WHERE cargo = 'TECNICO');
+IF @tecnicoId IS NULL SET @tecnicoId = @adminId;
+
+-- Base numérica para número sequencial da OS (evita conflito com OSs existentes)
+DECLARE @baseNum INT = ISNULL((
+    SELECT MAX(TRY_CAST(REPLACE(numero_ordem, 'OS-2026-', '') AS INT)) 
+    FROM ordens_servico 
+    WHERE numero_ordem LIKE 'OS-2026-%'
+), 0);
+
+-- Tabela temporária para iterar sobre equipamentos e clientes existentes
+DECLARE @EquipamentosDisponiveis TABLE (
+    idx INT IDENTITY(1,1),
+    equipamento_id VARCHAR(36),
+    cliente_id VARCHAR(36)
+);
+
+INSERT INTO @EquipamentosDisponiveis (equipamento_id, cliente_id)
+SELECT TOP 60 id, cliente_id 
+FROM equipamentos 
+WHERE ativo = 1 AND cliente_id IS NOT NULL
+ORDER BY NEWID();
+
+DECLARE @totalEquips INT = (SELECT COUNT(1) FROM @EquipamentosDisponiveis);
+DECLARE @i_os INT = 1;
+
+WHILE @i_os <= @totalEquips AND @i_os <= 60
+BEGIN
+    DECLARE @eqId VARCHAR(36);
+    DECLARE @clId VARCHAR(36);
+    SELECT @eqId = equipamento_id, @clId = cliente_id 
+    FROM @EquipamentosDisponiveis 
+    WHERE idx = @i_os;
+
+    DECLARE @numOrdem NVARCHAR(30) = 'OS-2026-' + RIGHT('0000' + CAST((@baseNum + @i_os) AS VARCHAR), 4);
+    
+    -- Status variado entre 1 e 9
+    DECLARE @statusOS INT = ((@i_os - 1) % 9) + 1;
+
+    -- Técnico atribuído (para status > 1, alterna entre Carlos, Admin ou não atribuído)
+    DECLARE @tecOS VARCHAR(36) = NULL;
+    IF @statusOS > 1
+    BEGIN
+        IF @i_os % 3 = 0 SET @tecOS = @adminId;
+        ELSE IF @i_os % 3 = 1 SET @tecOS = @tecnicoId;
+        ELSE SET @tecOS = NULL;
+    END
+
+    -- Tipos de Reparo e Descrições realistas
+    DECLARE @tipoReparo NVARCHAR(50);
+    DECLARE @descProblema NVARCHAR(MAX);
+    DECLARE @laudoTecnico NVARCHAR(MAX) = NULL;
+
+    DECLARE @modReparo INT = @i_os % 6;
+    IF @modReparo = 0
+    BEGIN
+        SET @tipoReparo = 'Troca de Display / Tela';
+        SET @descProblema = 'Tela trincada após queda acidental. Display apresentando faixas horizontais coloridas e falha no touch screen.';
+        SET @laudoTecnico = 'Substituição do módulo frontal display/touch realizada com sucesso. Testes de sensibilidade e brilho aprovados.';
+    END
+    ELSE IF @modReparo = 1
+    BEGIN
+        SET @tipoReparo = 'Reparo em Placa Mãe';
+        SET @descProblema = 'Equipamento não liga nem dá sinal ao conectar fonte de alimentação. Led de carregamento pisca intermitente.';
+        SET @laudoTecnico = 'Identificado curto-circuito na linha primária de alimentação de 19V. Substituição de mosfet de entrada e capacitor.';
+    END
+    ELSE IF @modReparo = 2
+    BEGIN
+        SET @tipoReparo = 'Formatação e Instalação de SO';
+        SET @descProblema = 'Sistema operacional corrompido, travando na inicialização em tela azul com código de erro 0xc00000e.';
+        SET @laudoTecnico = 'Instalação limpa do Windows 11 Pro de 64 bits, particionamento otimizado, atualização de BIOS e drivers do fabricante.';
+    END
+    ELSE IF @modReparo = 3
+    BEGIN
+        SET @tipoReparo = 'Manutenção Preventiva e Limpeza';
+        SET @descProblema = 'Superaquecimento excessivo com barulho no cooler interno e desligamento forçado durante execução de tarefas.';
+        SET @laudoTecnico = 'Desmontagem técnica completa, desobstrução das aletas do dissipador, lubrificação do cooler e aplicação de pasta térmica.';
+    END
+    ELSE IF @modReparo = 4
+    BEGIN
+        SET @tipoReparo = 'Troca de Bateria';
+        SET @descProblema = 'Bateria estufada com autonomia reduzida para menos de 15 minutos fora da tomada elétrica.';
+        SET @laudoTecnico = 'Substituição da bateria por modelo homologado original. Ciclo de calibração de carga e descarga validado em 100%.';
+    END
+    ELSE
+    BEGIN
+        SET @tipoReparo = 'Upgrade de SSD e Memória RAM';
+        SET @descProblema = 'Cliente solicita melhoria de performance e aumento de capacidade de armazenamento para trabalho home office.';
+        SET @laudoTecnico = 'Instalação de SSD M.2 NVMe de 512GB e expansão de memória para 16GB DDR4 em dual-channel. Clonagem de partição.';
+    END
+
+    -- Se o status for inicial (1 ou 2), laudo técnico pode estar em diagnóstico
+    IF @statusOS <= 2 AND @i_os % 2 = 0
+    BEGIN
+        SET @laudoTecnico = 'Equipamento em bancada aguardando início dos testes em diagnóstico avançado.';
+    END
+
+    -- Data de abertura distribuída nos últimos 60 dias
+    DECLARE @diasAtras INT = ((@i_os * 7) % 55) + 1;
+    DECLARE @dtAbertura DATETIME2 = DATEADD(DAY, -@diasAtras, GETDATE());
+    DECLARE @dtFechamento DATETIME2 = NULL;
+    
+    -- Para status 8 (Entregue) ou 9 (Cancelado), data de fechamento preenchida
+    IF @statusOS IN (8, 9)
+    BEGIN
+        SET @dtFechamento = DATEADD(DAY, 3, @dtAbertura);
+    END
+
+    -- Algumas poucas OS inativas para testar filtro de inativas
+    DECLARE @osAtiva BIT = 1;
+    IF @i_os IN (10, 25, 40) SET @osAtiva = 0;
+
+    DECLARE @novaOSId VARCHAR(36) = LOWER(NEWID());
+
+    INSERT INTO ordens_servico (
+        id, numero_ordem, tipo_reparo, perguntas_triagem, descricao_problema,
+        laudo_tecnico, observacoes_atendimento, status_id, cliente_id,
+        equipamento_id, atendente_id, tecnico_id, ativo, aberto_em, fechado_em, criado_em, atualizado_em
+    ) VALUES (
+        @novaOSId,
+        @numOrdem,
+        @tipoReparo,
+        '{"liga": true, "avaria_visivel": "pequenos riscos de uso", "acessorios": "Fonte de alimentacao e cabo", "termo_garantia": true}',
+        @descProblema,
+        @laudoTecnico,
+        'Atendimento registrado com prioridade padrão. Cliente autorizou triagem técnica preliminar.',
+        @statusOS,
+        @clId,
+        @eqId,
+        @atendenteId,
+        @tecOS,
+        @osAtiva,
+        @dtAbertura,
+        @dtFechamento,
+        @dtAbertura,
+        ISNULL(@dtFechamento, GETDATE())
+    );
+
+    -- 2. VINCULAR PEÇAS À OS (produtos_ordem) para alimentar valores nos Relatórios (RF12)
+    -- Insere de 1 a 2 produtos mock para ordens em andamento ou finalizadas
+    IF @statusOS >= 3
+    BEGIN
+        INSERT INTO produtos_ordem (id, ordem_id, produto_id, quantidade, preco_unitario, baixado, baixado_estoque, ativo, criado_em)
+        SELECT TOP 1 
+            LOWER(NEWID()),
+            @novaOSId,
+            p.id,
+            1,
+            p.preco,
+            1,
+            1,
+            1,
+            @dtAbertura
+        FROM produtos p
+        WHERE p.ativo = 1
+        ORDER BY NEWID();
+
+        IF @i_os % 2 = 0
+        BEGIN
+            INSERT INTO produtos_ordem (id, ordem_id, produto_id, quantidade, preco_unitario, baixado, baixado_estoque, ativo, criado_em)
+            SELECT TOP 1 
+                LOWER(NEWID()),
+                @novaOSId,
+                p.id,
+                2,
+                p.preco,
+                1,
+                1,
+                1,
+                @dtAbertura
+            FROM produtos p
+            WHERE p.ativo = 1
+            ORDER BY NEWID();
+        END
+    END
+
+    -- 3. HISTÓRICO DE ANDAMENTO (historico_ordens)
+    INSERT INTO historico_ordens (id, ordem_id, usuario_id, tipo_registro, status_id, etapa, descricao, ativo, criado_em)
+    VALUES (
+        LOWER(NEWID()),
+        @novaOSId,
+        @atendenteId,
+        'STATUS',
+        1,
+        'Abertura de OS',
+        'Ordem de serviço registrada no sistema no balcão de atendimento.',
+        1,
+        @dtAbertura
+    );
+
+    IF @statusOS > 1
+    BEGIN
+        INSERT INTO historico_ordens (id, ordem_id, usuario_id, tipo_registro, status_id, etapa, descricao, ativo, criado_em)
+        VALUES (
+            LOWER(NEWID()),
+            @novaOSId,
+            ISNULL(@tecOS, @adminId),
+            'PARECER',
+            @statusOS,
+            'Evolução Técnica',
+            'Equipamento inspecionado e diagnóstico registrado na bancada técnica.',
+            1,
+            DATEADD(DAY, 1, @dtAbertura)
+        );
+    END
+
+    -- 4. LOGS DE AUDITORIA (AuditLogs - RF11)
+    -- Gera logs de auditoria realistas para cada OS
+    INSERT INTO AuditLogs (id, usuario_id, usuario_nome, acao, metodo, rota, entidade, entidade_id, dados_alterados, endereco_ip, criado_em)
+    VALUES (
+        LOWER(NEWID()),
+        @atendenteId,
+        'Ana Costa (Atendente)',
+        'CRIAR_ORDEM_SERVICO',
+        'POST',
+        '/ordens-servico',
+        'ORDEM_SERVICO',
+        @novaOSId,
+        '{"numeroOrdem": "' + @numOrdem + '", "clienteId": "' + @clId + '", "tipoReparo": "' + @tipoReparo + '", "statusId": 1}',
+        '192.168.1.15',
+        @dtAbertura
+    );
+
+    IF @statusOS > 1
+    BEGIN
+        INSERT INTO AuditLogs (id, usuario_id, usuario_nome, acao, metodo, rota, entidade, entidade_id, dados_alterados, endereco_ip, criado_em)
+        VALUES (
+            LOWER(NEWID()),
+            ISNULL(@tecOS, @adminId),
+            CASE WHEN @tecOS = @adminId THEN 'Administrador Rocha Magazine' ELSE 'Carlos Souza (Tecnico)' END,
+            'ATUALIZAR_STATUS_OS',
+            'PATCH',
+            '/ordens-servico/' + @novaOSId + '/status',
+            'ORDEM_SERVICO',
+            @novaOSId,
+            '{"statusAnterior": 1, "statusNovo": ' + CAST(@statusOS AS VARCHAR) + ', "motivo": "Evolução do processo de bancada"}',
+            '192.168.1.28',
+            DATEADD(DAY, 1, @dtAbertura)
+        );
+    END
+
+    IF @osAtiva = 0
+    BEGIN
+        INSERT INTO AuditLogs (id, usuario_id, usuario_nome, acao, metodo, rota, entidade, entidade_id, dados_alterados, endereco_ip, criado_em)
+        VALUES (
+            LOWER(NEWID()),
+            @adminId,
+            'Administrador Rocha Magazine',
+            'INATIVAR_OS',
+            'PATCH',
+            '/ordens-servico/' + @novaOSId + '/alternar-ativo',
+            'ORDEM_SERVICO',
+            @novaOSId,
+            '{"ativo": false, "justificativa": "Cancelamento a pedido do cliente ou registro duplicado"}',
+            '127.0.0.1',
+            DATEADD(DAY, 2, @dtAbertura)
+        );
+    END
+
+    SET @i_os = @i_os + 1;
+END
+
+PRINT '60 Ordens de Serviço, Peças, Histórico e Logs de Auditoria inseridos com sucesso.';
+GO
+
+
+-- =========================================================================
+-- CARGA DE ORDENS DE SERVIÇO EM MASSA (60 OSs com status, técnicos e peças)
+-- =========================================================================
+PRINT 'Iniciando carga de 60 Ordens de Serviço (RF06, RF09 e RF12)...';
+
+DECLARE @adminId VARCHAR(36) = (SELECT TOP 1 id FROM usuarios WHERE email = 'admin@mediator.com');
+DECLARE @atendenteId VARCHAR(36) = (SELECT TOP 1 id FROM usuarios WHERE email = 'ana@mediator.com');
+DECLARE @tecnicoId VARCHAR(36) = (SELECT TOP 1 id FROM usuarios WHERE email = 'carlos@mediator.com');
+
+-- Caso usuários padrão não existam com esses emails, pega por cargo
+IF @adminId IS NULL SET @adminId = (SELECT TOP 1 id FROM usuarios WHERE cargo = 'ADMIN');
+IF @atendenteId IS NULL SET @atendenteId = (SELECT TOP 1 id FROM usuarios WHERE cargo = 'ATENDENTE');
+IF @atendenteId IS NULL SET @atendenteId = @adminId;
+IF @tecnicoId IS NULL SET @tecnicoId = (SELECT TOP 1 id FROM usuarios WHERE cargo = 'TECNICO');
+IF @tecnicoId IS NULL SET @tecnicoId = @adminId;
+
+-- Base numérica para número sequencial da OS (evita conflito com OSs existentes)
+DECLARE @baseNum INT = ISNULL((
+    SELECT MAX(TRY_CAST(REPLACE(numero_ordem, 'OS-2026-', '') AS INT)) 
+    FROM ordens_servico 
+    WHERE numero_ordem LIKE 'OS-2026-%'
+), 0);
+
+-- Tabela temporária para iterar sobre equipamentos e clientes existentes
+DECLARE @EquipamentosDisponiveis TABLE (
+    idx INT IDENTITY(1,1),
+    equipamento_id VARCHAR(36),
+    cliente_id VARCHAR(36)
+);
+
+INSERT INTO @EquipamentosDisponiveis (equipamento_id, cliente_id)
+SELECT TOP 60 id, cliente_id 
+FROM equipamentos 
+WHERE ativo = 1 AND cliente_id IS NOT NULL
+ORDER BY NEWID();
+
+DECLARE @totalEquips INT = (SELECT COUNT(1) FROM @EquipamentosDisponiveis);
+DECLARE @i_os INT = 1;
+
+WHILE @i_os <= @totalEquips AND @i_os <= 60
+BEGIN
+    DECLARE @eqId VARCHAR(36);
+    DECLARE @clId VARCHAR(36);
+    SELECT @eqId = equipamento_id, @clId = cliente_id 
+    FROM @EquipamentosDisponiveis 
+    WHERE idx = @i_os;
+
+    DECLARE @numOrdem NVARCHAR(30) = 'OS-2026-' + RIGHT('0000' + CAST((@baseNum + @i_os) AS VARCHAR), 4);
+    
+    -- Status variado entre 1 e 9
+    DECLARE @statusOS INT = ((@i_os - 1) % 9) + 1;
+
+    -- Técnico atribuído (para status > 1, alterna entre Carlos, Admin ou não atribuído)
+    DECLARE @tecOS VARCHAR(36) = NULL;
+    IF @statusOS > 1
+    BEGIN
+        IF @i_os % 3 = 0 SET @tecOS = @adminId;
+        ELSE IF @i_os % 3 = 1 SET @tecOS = @tecnicoId;
+        ELSE SET @tecOS = NULL;
+    END
+
+    -- Tipos de Reparo e Descrições realistas
+    DECLARE @tipoReparo NVARCHAR(50);
+    DECLARE @descProblema NVARCHAR(MAX);
+    DECLARE @laudoTecnico NVARCHAR(MAX) = NULL;
+
+    DECLARE @modReparo INT = @i_os % 6;
+    IF @modReparo = 0
+    BEGIN
+        SET @tipoReparo = 'Troca de Display / Tela';
+        SET @descProblema = 'Tela trincada após queda acidental. Display apresentando faixas horizontais coloridas e falha no touch screen.';
+        SET @laudoTecnico = 'Substituição do módulo frontal display/touch realizada com sucesso. Testes de sensibilidade e brilho aprovados.';
+    END
+    ELSE IF @modReparo = 1
+    BEGIN
+        SET @tipoReparo = 'Reparo em Placa Mãe';
+        SET @descProblema = 'Equipamento não liga nem dá sinal ao conectar fonte de alimentação. Led de carregamento pisca intermitente.';
+        SET @laudoTecnico = 'Identificado curto-circuito na linha primária de alimentação de 19V. Substituição de mosfet de entrada e capacitor.';
+    END
+    ELSE IF @modReparo = 2
+    BEGIN
+        SET @tipoReparo = 'Formatação e Instalação de SO';
+        SET @descProblema = 'Sistema operacional corrompido, travando na inicialização em tela azul com código de erro 0xc00000e.';
+        SET @laudoTecnico = 'Instalação limpa do Windows 11 Pro de 64 bits, particionamento otimizado, atualização de BIOS e drivers do fabricante.';
+    END
+    ELSE IF @modReparo = 3
+    BEGIN
+        SET @tipoReparo = 'Manutenção Preventiva e Limpeza';
+        SET @descProblema = 'Superaquecimento excessivo com barulho no cooler interno e desligamento forçado durante execução de tarefas.';
+        SET @laudoTecnico = 'Desmontagem técnica completa, desobstrução das aletas do dissipador, lubrificação do cooler e aplicação de pasta térmica.';
+    END
+    ELSE IF @modReparo = 4
+    BEGIN
+        SET @tipoReparo = 'Troca de Bateria';
+        SET @descProblema = 'Bateria estufada com autonomia reduzida para menos de 15 minutos fora da tomada elétrica.';
+        SET @laudoTecnico = 'Substituição da bateria por modelo homologado original. Ciclo de calibração de carga e descarga validado em 100%.';
+    END
+    ELSE
+    BEGIN
+        SET @tipoReparo = 'Upgrade de SSD e Memória RAM';
+        SET @descProblema = 'Cliente solicita melhoria de performance e aumento de capacidade de armazenamento para trabalho home office.';
+        SET @laudoTecnico = 'Instalação de SSD M.2 NVMe de 512GB e expansão de memória para 16GB DDR4 em dual-channel. Clonagem de partição.';
+    END
+
+    -- Se o status for inicial (1 ou 2), laudo técnico pode estar em diagnóstico
+    IF @statusOS <= 2 AND @i_os % 2 = 0
+    BEGIN
+        SET @laudoTecnico = 'Equipamento em bancada aguardando início dos testes em diagnóstico avançado.';
+    END
+
+    -- Data de abertura distribuída nos últimos 60 dias
+    DECLARE @diasAtras INT = ((@i_os * 7) % 55) + 1;
+    DECLARE @dtAbertura DATETIME2 = DATEADD(DAY, -@diasAtras, GETDATE());
+    DECLARE @dtFechamento DATETIME2 = NULL;
+    
+    -- Para status 8 (Entregue) ou 9 (Cancelado), data de fechamento preenchida
+    IF @statusOS IN (8, 9)
+    BEGIN
+        SET @dtFechamento = DATEADD(DAY, 3, @dtAbertura);
+    END
+
+    -- Algumas poucas OS inativas para testar filtro de inativas
+    DECLARE @osAtiva BIT = 1;
+    IF @i_os IN (10, 25, 40) SET @osAtiva = 0;
+
+    DECLARE @novaOSId VARCHAR(36) = LOWER(NEWID());
+
+    INSERT INTO ordens_servico (
+        id, numero_ordem, tipo_reparo, perguntas_triagem, descricao_problema,
+        laudo_tecnico, observacoes_atendimento, status_id, cliente_id,
+        equipamento_id, atendente_id, tecnico_id, ativo, aberto_em, fechado_em, criado_em, atualizado_em
+    ) VALUES (
+        @novaOSId,
+        @numOrdem,
+        @tipoReparo,
+        '{"liga": true, "avaria_visivel": "pequenos riscos de uso", "acessorios": "Fonte de alimentacao e cabo", "termo_garantia": true}',
+        @descProblema,
+        @laudoTecnico,
+        'Atendimento registrado com prioridade padrão. Cliente autorizou triagem técnica preliminar.',
+        @statusOS,
+        @clId,
+        @eqId,
+        @atendenteId,
+        @tecOS,
+        @osAtiva,
+        @dtAbertura,
+        @dtFechamento,
+        @dtAbertura,
+        ISNULL(@dtFechamento, GETDATE())
+    );
+
+    -- 2. VINCULAR PEÇAS À OS (produtos_ordem) para alimentar valores nos Relatórios (RF12)
+    -- Insere de 1 a 2 produtos mock para ordens em andamento ou finalizadas
+    IF @statusOS >= 3
+    BEGIN
+        INSERT INTO produtos_ordem (id, ordem_id, produto_id, quantidade, preco_unitario, baixado, baixado_estoque, ativo, criado_em)
+        SELECT TOP 1 
+            LOWER(NEWID()),
+            @novaOSId,
+            p.id,
+            1,
+            p.preco,
+            1,
+            1,
+            1,
+            @dtAbertura
+        FROM produtos p
+        WHERE p.ativo = 1
+        ORDER BY NEWID();
+
+        IF @i_os % 2 = 0
+        BEGIN
+            INSERT INTO produtos_ordem (id, ordem_id, produto_id, quantidade, preco_unitario, baixado, baixado_estoque, ativo, criado_em)
+            SELECT TOP 1 
+                LOWER(NEWID()),
+                @novaOSId,
+                p.id,
+                2,
+                p.preco,
+                1,
+                1,
+                1,
+                @dtAbertura
+            FROM produtos p
+            WHERE p.ativo = 1
+            ORDER BY NEWID();
+        END
+    END
+
+    -- 3. HISTÓRICO DE ANDAMENTO (historico_ordens)
+    INSERT INTO historico_ordens (id, ordem_id, usuario_id, tipo_registro, status_id, etapa, descricao, ativo, criado_em)
+    VALUES (
+        LOWER(NEWID()),
+        @novaOSId,
+        @atendenteId,
+        'STATUS',
+        1,
+        'Abertura de OS',
+        'Ordem de serviço registrada no sistema no balcão de atendimento.',
+        1,
+        @dtAbertura
+    );
+
+    IF @statusOS > 1
+    BEGIN
+        INSERT INTO historico_ordens (id, ordem_id, usuario_id, tipo_registro, status_id, etapa, descricao, ativo, criado_em)
+        VALUES (
+            LOWER(NEWID()),
+            @novaOSId,
+            ISNULL(@tecOS, @adminId),
+            'PARECER',
+            @statusOS,
+            'Evolução Técnica',
+            'Equipamento inspecionado e diagnóstico registrado na bancada técnica.',
+            1,
+            DATEADD(DAY, 1, @dtAbertura)
+        );
+    END
+
+    -- 4. LOGS DE AUDITORIA (AuditLogs - RF11)
+    -- Gera logs de auditoria realistas para cada OS
+    INSERT INTO AuditLogs (id, usuario_id, usuario_nome, acao, metodo, rota, entidade, entidade_id, dados_alterados, endereco_ip, criado_em)
+    VALUES (
+        LOWER(NEWID()),
+        @atendenteId,
+        'Ana Costa (Atendente)',
+        'CRIAR_ORDEM_SERVICO',
+        'POST',
+        '/ordens-servico',
+        'ORDEM_SERVICO',
+        @novaOSId,
+        '{"numeroOrdem": "' + @numOrdem + '", "clienteId": "' + @clId + '", "tipoReparo": "' + @tipoReparo + '", "statusId": 1}',
+        '192.168.1.15',
+        @dtAbertura
+    );
+
+    IF @statusOS > 1
+    BEGIN
+        INSERT INTO AuditLogs (id, usuario_id, usuario_nome, acao, metodo, rota, entidade, entidade_id, dados_alterados, endereco_ip, criado_em)
+        VALUES (
+            LOWER(NEWID()),
+            ISNULL(@tecOS, @adminId),
+            CASE WHEN @tecOS = @adminId THEN 'Administrador Rocha Magazine' ELSE 'Carlos Souza (Tecnico)' END,
+            'ATUALIZAR_STATUS_OS',
+            'PATCH',
+            '/ordens-servico/' + @novaOSId + '/status',
+            'ORDEM_SERVICO',
+            @novaOSId,
+            '{"statusAnterior": 1, "statusNovo": ' + CAST(@statusOS AS VARCHAR) + ', "motivo": "Evolução do processo de bancada"}',
+            '192.168.1.28',
+            DATEADD(DAY, 1, @dtAbertura)
+        );
+    END
+
+    IF @osAtiva = 0
+    BEGIN
+        INSERT INTO AuditLogs (id, usuario_id, usuario_nome, acao, metodo, rota, entidade, entidade_id, dados_alterados, endereco_ip, criado_em)
+        VALUES (
+            LOWER(NEWID()),
+            @adminId,
+            'Administrador Rocha Magazine',
+            'INATIVAR_OS',
+            'PATCH',
+            '/ordens-servico/' + @novaOSId + '/alternar-ativo',
+            'ORDEM_SERVICO',
+            @novaOSId,
+            '{"ativo": false, "justificativa": "Cancelamento a pedido do cliente ou registro duplicado"}',
+            '127.0.0.1',
+            DATEADD(DAY, 2, @dtAbertura)
+        );
+    END
+
+    SET @i_os = @i_os + 1;
+END
+
+PRINT '60 Ordens de Serviço, Peças, Histórico e Logs de Auditoria inseridos com sucesso.';
 GO

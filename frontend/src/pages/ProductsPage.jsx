@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useState, useEffect } from 'react';
 import {
   Package,
@@ -23,7 +24,16 @@ export const ProductsPage = () => {
   const { ehAdmin } = useAuth();
   const [produtos, setProdutos] = useState([]);
   const [busca, setBusca] = useState('');
+  const [buscaDebounced, setBuscaDebounced] = useState('');
   const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setBuscaDebounced(busca);
+      setPagina(1);
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [busca]);
 
   // Estados do modal
   const [mostrarModal, setMostrarModal] = useState(false);
@@ -74,7 +84,7 @@ export const ProductsPage = () => {
     try {
       setCarregando(true);
       const params = new URLSearchParams();
-      if (busca) params.append('busca', busca);
+      if (buscaDebounced) params.append('busca', buscaDebounced);
       if (exibirInativos) params.append('incluirInativos', 'true');
       params.append('orderBy', orderBy);
       params.append('orderDirection', orderDirection);
@@ -100,7 +110,7 @@ export const ProductsPage = () => {
 
   useEffect(() => {
     buscarProdutos();
-  }, [busca, exibirInativos, pagina, orderBy, orderDirection]);
+  }, [buscaDebounced, exibirInativos, pagina, orderBy, orderDirection]);
 
   const abrirModalCriacao = () => {
     setErroFormulario('');
@@ -199,9 +209,14 @@ export const ProductsPage = () => {
     <div className="page-shell">
       {/* Cabeçalho */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="page-title">Produtos e Peças</h1>
-          <p className="page-subtitle">Controle de estoque de componentes, peças de reposição e periféricos</p>
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0D223A] text-white shadow-sm">
+            <Package className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="page-title">Produtos e Peças</h1>
+            <p className="page-subtitle">Controle de estoque de componentes, peças de reposição e periféricos</p>
+          </div>
         </div>
         <button onClick={abrirModalCriacao} className="primary-action">
           <Plus className="w-4 h-4" />
@@ -382,8 +397,9 @@ export const ProductsPage = () => {
       </div>
 
       {/* Modal de Cadastro / Edição */}
-      {mostrarModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+      {mostrarModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#0D223A]/60 p-4 backdrop-blur-xs">
+
           <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-xl animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-semibold text-slate-900 mb-4">
               {estaEditando ? 'Editar Produto / Peça' : 'Novo Produto / Peça'}
@@ -500,7 +516,8 @@ export const ProductsPage = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -195,7 +195,7 @@ export const OrderKanban = ({
           <button
             type="button"
             onClick={aoAdicionarColuna}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-slate-800 transition"
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#0D223A] px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#081524] transition"
           >
             <Plus className="h-4 w-4" />
             Adicionar Primeira Coluna

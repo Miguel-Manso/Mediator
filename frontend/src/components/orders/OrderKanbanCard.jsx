@@ -44,7 +44,7 @@ const getEquipamentoIcone = (descricao = '', categoria = '') => {
   return Wrench;
 };
 
-export const OrderKanbanCard = ({
+export const OrderKanbanCard = React.memo(({
   os,
   corColuna,
   indice,
@@ -323,4 +323,4 @@ export const OrderKanbanCard = ({
       </div>
     </div>
   );
-};
+});

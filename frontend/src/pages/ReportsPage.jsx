@@ -9,10 +9,8 @@ import {
   Printer,
   ChevronDown,
   ChevronUp,
-  Download,
   RotateCcw,
   Clock,
-  Layers,
   DollarSign,
   AlertCircle,
   FileSpreadsheet,
@@ -139,8 +137,12 @@ export const ReportsPage = () => {
     }
   };
 
-  // Expande todos os registros automaticamente antes de imprimir
+  const tituloOriginalRef = React.useRef(document.title);
+
+  // Expande todos os registros automaticamente antes de imprimir e limpa título do browser
   const prepararImpressao = () => {
+    tituloOriginalRef.current = document.title;
+    document.title = '';
     const novos = {};
     (relatorio?.grupos || []).forEach((_, idx) => {
       novos[idx] = true;
@@ -157,11 +159,18 @@ export const ReportsPage = () => {
 
   useEffect(() => {
     const handleBeforePrint = () => {
+      tituloOriginalRef.current = document.title;
+      document.title = '';
       prepararImpressao();
     };
+    const handleAfterPrint = () => {
+      document.title = tituloOriginalRef.current || 'Mediator';
+    };
     window.addEventListener('beforeprint', handleBeforePrint);
+    window.addEventListener('afterprint', handleAfterPrint);
     return () => {
       window.removeEventListener('beforeprint', handleBeforePrint);
+      window.removeEventListener('afterprint', handleAfterPrint);
     };
   }, [relatorio]);
 
@@ -179,26 +188,47 @@ export const ReportsPage = () => {
       )}
 
       {/* Cabeçalho da Página */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between print:border-b print:border-slate-300 print:pb-3">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between print:border-b-2 print:border-[#0D223A] print:pb-3 print:mb-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 text-white shadow-sm print:hidden">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0D223A] text-white shadow-sm print:hidden">
             <BarChart3 className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 print:text-xl">
-              Relatório Operacional Master-Detail
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 print:text-xl print:font-extrabold print:text-[#0D223A]">
+              Relatório Operacional
             </h1>
-            <p className="text-[11px] text-slate-500 hidden print:block mt-0.5">
-              Emitido em: {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • Sistema Mediator
+            <p className="text-xs text-slate-500 print:hidden mt-0.5">
+              Acompanhamento analítico e consolidado de ordens de serviço, clientes e técnicos.
             </p>
+            <div className="text-[10.5px] text-slate-600 hidden print:flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
+              <span className="font-semibold text-slate-800">
+                Agrupamento: {
+                  agrupamento === 'cliente' ? 'Por Cliente' :
+                  agrupamento === 'tecnico' ? 'Por Técnico' :
+                  agrupamento === 'status' ? 'Por Status' : 'Lista Completa'
+                }
+              </span>
+              <span>•</span>
+              <span>
+                Período: {dataInicio ? formatarData(dataInicio) : 'Início'} até {dataFim ? formatarData(dataFim) : 'Hoje'}
+              </span>
+              <span>•</span>
+              <span>Total de grupos: {grupos.length}</span>
+            </div>
           </div>
+        </div>
+
+        <div className="hidden print:block text-right text-[10.5px] text-slate-600">
+          <p className="font-semibold text-slate-800">
+            Emitido em: {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </p>
         </div>
 
         <div className="flex items-center gap-2 print:hidden">
           <button
             type="button"
             onClick={imprimirRelatorio}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
+            className="secondary-highlight-action"
           >
             <Printer className="h-3.5 w-3.5 text-slate-500" />
             <span>Imprimir Relatório</span>
@@ -214,8 +244,8 @@ export const ReportsPage = () => {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-slate-700 shrink-0" />
-            <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Parametrização do Relatório
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+              Painel de Filtros do Relatório
             </h2>
           </div>
           <span className="text-[11px] text-slate-400">
@@ -223,32 +253,32 @@ export const ReportsPage = () => {
           </span>
         </div>
 
-        {/* 1. Escolha do Agrupamento Master-Detail */}
+        {/* 1. Escolha do Agrupamento */}
         <div>
-          <label className="mb-1.5 block text-xs font-bold text-slate-800">
-            Estrutura de Agrupamento Master-Detail
+          <label className="mb-2 block text-sm font-bold text-slate-900">
+            Estrutura de Agrupamento do Relatório
           </label>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
-              { id: 'cliente', label: 'Por Cliente', desc: 'Cliente (Master) > OSs (Detail)' },
-              { id: 'tecnico', label: 'Por Técnico', desc: 'Técnico (Master) > OSs (Detail)' },
-              { id: 'status', label: 'Por Status', desc: 'Status (Master) > OSs (Detail)' },
+              { id: 'cliente', label: 'Por Cliente', desc: 'Cliente > OS' },
+              { id: 'tecnico', label: 'Por Técnico', desc: 'Técnico > OS' },
+              { id: 'status', label: 'Por Status', desc: 'Status > OS' },
               { id: 'geral', label: 'Lista Completa', desc: 'OS individual detalhada' },
             ].map((modo) => (
               <button
                 key={modo.id}
                 type="button"
                 onClick={() => setAgrupamento(modo.id)}
-                className={`flex flex-col text-left rounded-xl border p-2.5 transition ${
+                className={`flex flex-col text-left rounded-xl border p-3 transition select-none ${
                   agrupamento === modo.id
-                    ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
-                    : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100 text-slate-700'
+                    ? 'border-[#0D223A] bg-[#0D223A] text-white shadow-xs'
+                    : 'border-slate-200 bg-slate-50/70 hover:bg-slate-100 text-slate-800 hover:border-slate-300'
                 }`}
               >
-                <span className="text-xs font-bold">{modo.label}</span>
+                <span className="text-sm font-bold leading-tight">{modo.label}</span>
                 <span
-                  className={`text-[10px] mt-0.5 ${
-                    agrupamento === modo.id ? 'text-slate-300' : 'text-slate-400'
+                  className={`text-xs font-medium mt-1 ${
+                    agrupamento === modo.id ? 'text-slate-200' : 'text-slate-500'
                   }`}
                 >
                   {modo.desc}
@@ -258,12 +288,11 @@ export const ReportsPage = () => {
           </div>
         </div>
 
-        {/* 2. Filtros Específicos */}
+        {/* 2. Filtros Específicos (Sem ícones nas labels e com ícones dos controles mais nítidos) */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 items-end pt-1">
           {/* Cliente com Busca Otimizada */}
           <div>
-            <label className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-              <User className="h-3 w-3 text-slate-400" />
+            <label className="mb-1.5 block text-xs font-bold text-slate-800">
               Filtrar Cliente
             </label>
             <SearchableCombobox
@@ -281,8 +310,7 @@ export const ReportsPage = () => {
 
           {/* Técnico com Busca Otimizada */}
           <div>
-            <label className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-              <Wrench className="h-3 w-3 text-slate-400" />
+            <label className="mb-1.5 block text-xs font-bold text-slate-800">
               Filtrar Técnico
             </label>
             <SearchableCombobox
@@ -300,8 +328,7 @@ export const ReportsPage = () => {
 
           {/* Status com Busca Otimizada */}
           <div>
-            <label className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-              <CheckCircle2 className="h-3 w-3 text-slate-400" />
+            <label className="mb-1.5 block text-xs font-bold text-slate-800">
               Status
             </label>
             <SearchableCombobox
@@ -319,108 +346,108 @@ export const ReportsPage = () => {
 
           {/* Período: Início */}
           <div>
-            <label className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-              <Calendar className="h-3 w-3 text-slate-400" />
+            <label className="mb-1.5 block text-xs font-bold text-slate-800">
               Data Início
             </label>
             <input
               type="date"
               value={dataInicio}
               onChange={(e) => setDataInicio(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-1.5 px-2.5 text-xs text-slate-700 transition focus:border-slate-400 focus:bg-white focus:outline-none"
+              className="w-full rounded-lg border border-slate-200 bg-white py-2 px-2.5 text-xs text-slate-800 transition focus:border-slate-400 focus:bg-white focus:outline-none"
             />
           </div>
 
           {/* Período: Fim */}
           <div>
-            <label className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-              <Calendar className="h-3 w-3 text-slate-400" />
+            <label className="mb-1.5 block text-xs font-bold text-slate-800">
               Data Fim
             </label>
             <input
               type="date"
               value={dataFim}
               onChange={(e) => setDataFim(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-1.5 px-2.5 text-xs text-slate-700 transition focus:border-slate-400 focus:bg-white focus:outline-none"
+              className="w-full rounded-lg border border-slate-200 bg-white py-2 px-2.5 text-xs text-slate-800 transition focus:border-slate-400 focus:bg-white focus:outline-none"
             />
           </div>
         </div>
 
-        {/* Botões do Formulário */}
+        {/* Botões do Formulário com ícones escuros */}
         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
           <button
             type="button"
             onClick={handleLimpar}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
           >
-            <RotateCcw className="h-3.5 w-3.5 text-slate-400" />
+            <RotateCcw className="h-3.5 w-3.5 text-slate-600" />
             Limpar Critérios
           </button>
           <button
             type="submit"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 transition"
+            className="inline-flex items-center gap-1.5 rounded-lg border-2 border-[#0D223A] bg-white px-3 py-1.5 text-xs font-semibold text-[#0D223A] hover:bg-slate-50 transition shadow-xs"
           >
-            <FileSpreadsheet className="h-3.5 w-3.5" />
+            <FileSpreadsheet className="h-3.5 w-3.5 text-[#0D223A]" />
             Gerar Relatório
           </button>
         </div>
       </form>
 
-      {/* RESUMO EXECUTIVO (KPIS) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      {/* RESUMO EXECUTIVO (KPIS) - Compacto em modo de impressão */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 print:grid-cols-4 print:gap-2 print:mb-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:rounded-md print:border-slate-300 print:bg-slate-50/80 print:p-2 print:shadow-none">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase text-slate-400">Total de OS</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+            <span className="text-xs font-medium uppercase text-slate-400 print:text-[9px] print:font-bold print:text-slate-600">Total de OS</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-700 print:hidden">
               <FileSpreadsheet className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{resumo.totalOrdens || 0}</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900 print:mt-0.5 print:text-base print:font-extrabold print:text-[#0D223A]">
+            {resumo.totalOrdens || 0}
+          </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:rounded-md print:border-slate-300 print:bg-slate-50/80 print:p-2 print:shadow-none">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase text-slate-400">
+            <span className="text-xs font-medium uppercase text-slate-400 print:text-[9px] print:font-bold print:text-slate-600">
               {agrupamento === 'tecnico' ? 'Técnicos Listados' : 'Clientes Atendidos'}
             </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 print:hidden">
               <Users className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
+          <p className="mt-2 text-2xl font-bold text-slate-900 print:mt-0.5 print:text-base print:font-extrabold print:text-[#0D223A]">
             {agrupamento === 'tecnico' ? resumo.totalTecnicos || 0 : resumo.totalClientes || 0}
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:rounded-md print:border-slate-300 print:bg-slate-50/80 print:p-2 print:shadow-none">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase text-slate-400">Total em Peças</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+            <span className="text-xs font-medium uppercase text-slate-400 print:text-[9px] print:font-bold print:text-slate-600">Total em Peças</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 print:hidden">
               <DollarSign className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
+          <p className="mt-2 text-2xl font-bold text-slate-900 print:mt-0.5 print:text-base print:font-extrabold print:text-emerald-700">
             {maskCurrency(resumo.valorTotalProdutos || 0)}
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:rounded-md print:border-slate-300 print:bg-slate-50/80 print:p-2 print:shadow-none">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase text-slate-400">Tempo Médio</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+            <span className="text-xs font-medium uppercase text-slate-400 print:text-[9px] print:font-bold print:text-slate-600">Tempo Médio</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600 print:hidden">
               <Clock className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
-            {resumo.tempoMedioDias || 0} <span className="text-sm font-normal text-slate-500">dias</span>
+          <p className="mt-2 text-2xl font-bold text-slate-900 print:mt-0.5 print:text-base print:font-extrabold print:text-slate-800">
+            {resumo.tempoMedioDias || 0} <span className="text-sm font-normal text-slate-500 print:text-[10px] print:font-medium">dias</span>
           </p>
         </div>
       </div>
 
       {/* ÁREA DE EXIBIÇÃO MASTER-DETAIL */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-900">
+        <div className="flex items-center justify-between print:mb-2">
+          <h3 className="text-sm font-bold text-slate-900 print:text-xs print:font-extrabold print:text-slate-800">
             Detalhamento Operacional ({grupos.length} {grupos.length === 1 ? 'grupo' : 'grupos'})
           </h3>
 
@@ -458,7 +485,7 @@ export const ReportsPage = () => {
             </p>
           </div>
         ) : (
-          <div className="space-y-3 print:space-y-4 print:overflow-visible">
+          <div className="space-y-3 print:space-y-3 print:overflow-visible">
             {grupos.map((grupo, idx) => {
               const master = grupo.master || {};
               const detalhes = grupo.detalhes || [];
@@ -467,22 +494,22 @@ export const ReportsPage = () => {
               return (
                 <div
                   key={idx}
-                  className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs transition print:overflow-visible print:shadow-none print:break-inside-avoid print:border-slate-300 print:mb-4"
+                  className="report-group-card overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs transition print:overflow-visible print:shadow-none print:break-inside-avoid print:border-slate-300 print:mb-3.5 print:rounded-lg"
                 >
                   {/* Cabeçalho Master */}
                   <div
                     onClick={() => alternarExpansao(idx)}
-                    className="flex flex-col sm:flex-row cursor-pointer sm:items-center justify-between gap-3 bg-slate-50/80 px-4 py-3.5 hover:bg-slate-100/70 transition border-b border-slate-200/80 select-none"
+                    className="flex flex-col sm:flex-row cursor-pointer sm:items-center justify-between gap-3 bg-slate-50/80 px-4 py-3.5 hover:bg-slate-100/70 transition border-b border-slate-200/80 select-none print:py-1.5 print:px-3 print:bg-slate-100 print:border-slate-300"
                   >
-                    <div className="flex items-start sm:items-center gap-3 min-w-0">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-white font-bold text-xs">
+                    <div className="flex items-start sm:items-center gap-3 min-w-0 print:gap-2">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0D223A] text-white font-bold text-xs shadow-xs print:h-5 print:w-5 print:text-[10px] print:rounded">
                         {idx + 1}
                       </div>
                       <div className="min-w-0">
-                        <h4 className="text-sm font-bold text-slate-900 leading-tight truncate">
+                        <h4 className="text-sm font-bold text-slate-900 leading-tight truncate print:truncate-none print:whitespace-normal print:text-xs">
                           {master.nome || master.numeroOrdem || 'Registro Consolidado'}
                         </h4>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 print:text-[9.5px] print:text-slate-600">
                           {master.cpf && <span>CPF: {master.cpf}</span>}
                           {master.telefone && <span>• Tel: {master.telefone}</span>}
                           {master.email && master.email !== '-' && (
@@ -493,12 +520,12 @@ export const ReportsPage = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between sm:justify-end gap-4 pl-11 sm:pl-0 shrink-0">
+                    <div className="flex items-center justify-between sm:justify-end gap-4 pl-11 sm:pl-0 shrink-0 print:pl-0">
                       <div className="text-left sm:text-right">
-                        <span className="text-xs font-bold text-slate-900">
+                        <span className="text-xs font-bold text-slate-900 print:text-[10.5px]">
                           {master.totalOrdens} {master.totalOrdens === 1 ? 'OS' : 'OSs'}
                         </span>
-                        <p className="text-[11px] font-semibold text-emerald-600">
+                        <p className="text-[11px] font-semibold text-emerald-600 print:text-[10.5px] print:font-bold">
                           {maskCurrency(master.valorTotal || 0)}
                         </p>
                       </div>
@@ -517,62 +544,102 @@ export const ReportsPage = () => {
                     </div>
                   </div>
 
-                  {/* Tabela de Detalhes (Detail) */}
+                  {/* Tabela de Detalhes (Detail) com alinhamento uniforme rigoroso e colunas balanceadas para impressão */}
                   {estaExpandido && (
                     <div className="overflow-x-auto p-0 print:overflow-visible">
-                      <table className="w-full text-left text-xs text-slate-600">
-                        <thead className="bg-slate-100/60 text-[10px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                      <table className="w-full table-fixed text-left text-xs text-slate-600 print:text-[10px]">
+                        {agrupamento === 'cliente' ? (
+                          <colgroup>
+                            <col className="w-[15%]" />
+                            <col className="w-[27%]" />
+                            <col className="w-[17%]" />
+                            <col className="w-[11%]" />
+                            <col className="w-[17%]" />
+                            <col className="w-[13%]" />
+                          </colgroup>
+                        ) : agrupamento === 'tecnico' ? (
+                          <colgroup>
+                            <col className="w-[15%]" />
+                            <col className="w-[27%]" />
+                            <col className="w-[17%]" />
+                            <col className="w-[11%]" />
+                            <col className="w-[17%]" />
+                            <col className="w-[13%]" />
+                          </colgroup>
+                        ) : agrupamento === 'status' ? (
+                          <colgroup>
+                            <col className="w-[15%]" />
+                            <col className="w-[27%]" />
+                            <col className="w-[18%]" />
+                            <col className="w-[17%]" />
+                            <col className="w-[11%]" />
+                            <col className="w-[12%]" />
+                          </colgroup>
+                        ) : (
+                          <colgroup>
+                            <col className="w-[13%]" />
+                            <col className="w-[22%]" />
+                            <col className="w-[16%]" />
+                            <col className="w-[14%]" />
+                            <col className="w-[10%]" />
+                            <col className="w-[14%]" />
+                            <col className="w-[11%]" />
+                          </colgroup>
+                        )}
+                        <thead className="bg-slate-100/60 print:bg-slate-200/80 text-[10px] print:text-[9.5px] font-bold uppercase tracking-wider text-slate-500 print:text-slate-700 border-b border-slate-200 print:border-slate-300">
                           <tr>
-                            <th className="py-3 px-4">Número OS</th>
-                            <th className="py-3 px-4">Equipamento</th>
-                            {agrupamento !== 'cliente' && <th className="py-3 px-4">Cliente</th>}
-                            {agrupamento !== 'tecnico' && <th className="py-3 px-4">Técnico</th>}
-                            <th className="py-3 px-4">Abertura</th>
-                            <th className="py-3 px-4">Status</th>
-                            <th className="py-3 px-4 text-right">Valor Peças</th>
+                            <th className="py-3 px-4 print:py-1.5 print:px-2">Número OS</th>
+                            <th className="py-3 px-4 print:py-1.5 print:px-2">Equipamento</th>
+                            {agrupamento !== 'cliente' && <th className="py-3 px-4 print:py-1.5 print:px-2">Cliente</th>}
+                            {agrupamento !== 'tecnico' && <th className="py-3 px-4 print:py-1.5 print:px-2">Técnico</th>}
+                            <th className="py-3 px-4 print:py-1.5 print:px-2">Abertura</th>
+                            {agrupamento !== 'status' && <th className="py-3 px-4 print:py-1.5 print:px-2">Status</th>}
+                            <th className="py-3 px-4 print:py-1.5 print:px-2 text-right">Valor Peças</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-slate-100 print:divide-slate-200">
                           {detalhes.map((detalhe, dIdx) => (
-                            <tr key={dIdx} className="hover:bg-slate-50/50 transition">
-                              <td className="py-3 px-4 font-semibold text-slate-900 whitespace-nowrap">
+                            <tr key={dIdx} className="hover:bg-slate-50/50 print:hover:bg-transparent transition">
+                              <td className="py-3 px-4 print:py-1.5 print:px-2 font-semibold text-slate-900 truncate print:truncate-none print:whitespace-normal print:text-[10px]">
                                 {detalhe.numeroOrdem || detalhe.ordemId?.slice(0, 8)}
                               </td>
-                              <td className="py-3 px-4">
-                                <span className="font-medium text-slate-800">
+                              <td className="py-3 px-4 print:py-1.5 print:px-2">
+                                <span className="font-medium text-slate-800 block truncate print:truncate-none print:whitespace-normal print:text-[10px]" title={detalhe.equipamento?.descricao}>
                                   {detalhe.equipamento?.descricao || '-'}
                                 </span>
                                 {detalhe.equipamento?.marca && (
-                                  <span className="text-[10px] text-slate-400 block">
+                                  <span className="text-[10px] text-slate-400 block truncate print:truncate-none print:whitespace-normal print:text-[9px] print:text-slate-500">
                                     {detalhe.equipamento.marca}{' '}
                                     {detalhe.equipamento.modelo ? `/ ${detalhe.equipamento.modelo}` : ''}
                                   </span>
                                 )}
                               </td>
                               {agrupamento !== 'cliente' && (
-                                <td className="py-3 px-4">
+                                <td className="py-3 px-4 print:py-1.5 print:px-2 truncate print:truncate-none print:whitespace-normal print:text-[10px]" title={detalhe.cliente?.nome}>
                                   {detalhe.cliente?.nome || '-'}
                                 </td>
                               )}
                               {agrupamento !== 'tecnico' && (
-                                <td className="py-3 px-4">
+                                <td className="py-3 px-4 print:py-1.5 print:px-2 truncate print:truncate-none print:whitespace-normal print:text-[10px]" title={detalhe.tecnico?.nome}>
                                   {detalhe.tecnico?.nome || (
                                     <span className="italic text-slate-400">Não atribuído</span>
                                   )}
                                 </td>
                               )}
-                              <td className="py-3 px-4 whitespace-nowrap">
+                              <td className="py-3 px-4 print:py-1.5 print:px-2 whitespace-nowrap print:text-[10px] text-slate-600">
                                 {formatarData(detalhe.abertoEm)}
                               </td>
-                              <td className="py-3 px-4 whitespace-nowrap">
-                                <span
-                                  className="inline-flex items-center rounded-md px-2.5 py-0.5 text-[10px] font-bold text-white shadow-2xs"
-                                  style={{ backgroundColor: detalhe.status?.cor || '#64748B' }}
-                                >
-                                  {detalhe.status?.nome || 'Em Andamento'}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 text-right font-medium text-slate-900 whitespace-nowrap">
+                              {agrupamento !== 'status' && (
+                                <td className="py-3 px-4 print:py-1.5 print:px-2 whitespace-nowrap print:whitespace-normal">
+                                  <span
+                                    className="inline-flex items-center rounded-md px-2.5 py-0.5 text-[10px] font-bold text-white shadow-2xs print:text-[9px] print:leading-tight print:px-2 print:py-0.5 print:rounded print:shadow-none print:border print:border-black/10 print:whitespace-normal text-center"
+                                    style={{ backgroundColor: detalhe.status?.cor || '#64748B' }}
+                                  >
+                                    {detalhe.status?.nome || 'Em Andamento'}
+                                  </span>
+                                </td>
+                              )}
+                              <td className="py-3 px-4 print:py-1.5 print:px-2 text-right font-medium text-slate-900 whitespace-nowrap print:text-[10px] print:font-bold">
                                 {maskCurrency(detalhe.totalProdutos || 0)}
                               </td>
                             </tr>

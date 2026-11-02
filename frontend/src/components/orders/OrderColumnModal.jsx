@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useState, useEffect } from 'react';
 import { X, Palette, ListOrdered, Check, AlertCircle, Loader2 } from 'lucide-react';
 
@@ -85,8 +86,8 @@ export const OrderColumnModal = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
+  return typeof document !== 'undefined' ? createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-[#0D223A]/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="relative w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-xl transition-all">
         {/* Cabeçalho do Modal */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
@@ -266,7 +267,7 @@ export const OrderColumnModal = ({
             <button
               type="submit"
               disabled={salvando}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition disabled:opacity-50 shadow-sm"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#0D223A] px-5 py-2 text-xs font-semibold text-white hover:bg-[#081524] transition disabled:opacity-50 shadow-sm"
             >
               {salvando ? (
                 <>
@@ -280,6 +281,7 @@ export const OrderColumnModal = ({
           </div>
         </form>
       </div>
-    </div>
-  );
+    </div>,
+    document.body
+  ) : null;
 };

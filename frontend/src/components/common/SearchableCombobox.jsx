@@ -121,7 +121,7 @@ export const SearchableCombobox = ({
         } ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'} ${buttonClassName}`}
       >
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          {Icon && <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />}
+          {Icon && <Icon className="h-3.5 w-3.5 text-slate-600 shrink-0" />}
 
           {itemSelecionado ? (
             <div className="flex items-center gap-1.5 truncate">
@@ -152,13 +152,13 @@ export const SearchableCombobox = ({
               tabIndex={0}
               onClick={handleLimpar}
               title="Limpar seleção"
-              className="p-0.5 rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition"
+              className="p-0.5 rounded-full text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition"
             >
               <X className="h-3 w-3" />
             </span>
           )}
           <ChevronDown
-            className={`h-3 w-3 text-slate-400 transition-transform duration-150 ${
+            className={`h-3 w-3 text-slate-600 transition-transform duration-150 ${
               aberto ? 'rotate-180 text-slate-700' : ''
             }`}
           />
@@ -171,7 +171,7 @@ export const SearchableCombobox = ({
           {/* Input de Busca Rápida */}
           <div className="p-2 border-b border-slate-100 bg-slate-50/70">
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-600" />
               <input
                 ref={inputBuscaRef}
                 type="text"

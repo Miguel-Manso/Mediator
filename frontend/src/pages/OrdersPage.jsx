@@ -1,3 +1,4 @@
+import { ExpandableActionButton } from '../components/ui/ExpandableActionButton';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   ClipboardList,
@@ -21,6 +22,7 @@ import {
   Check,
   AlertCircle,
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../services/api';
 import { updateOSStatus } from '../services/orderService';
 import { maskCurrency } from '../utils/masks';
@@ -34,6 +36,7 @@ import { OrderColumnModal } from '../components/orders/OrderColumnModal';
 import { OrderInactivateColumnModal } from '../components/orders/OrderInactivateColumnModal';
 import { AdvancedFilterPanel } from '../components/orders/AdvancedFilterPanel';
 import { SearchableCombobox } from '../components/common/SearchableCombobox';
+import { ExpandableTabs } from '@/components/ui/expandable-tabs';
 import { useSocket } from '../contexts/SocketContext';
 
 export const OrdersPage = () => {
@@ -43,8 +46,16 @@ export const OrdersPage = () => {
   const { socket, inscreverReconexao } = useSocket();
   const podeGerenciarColunas = ehAdmin || ehAtendente;
 
-  // Modo de Visualização: 'tabela' ou 'kanban'
-  const [modoVisualizacao, setModoVisualizacao] = useState('kanban');
+    const [searchParams, setSearchParams] = useSearchParams();
+  const paramView = searchParams.get('view');
+  // Modo de Visualização sincronizado com a URL (tabela ou kanban)
+  const [modoVisualizacao, setModoVisualizacao] = useState(paramView === 'tabela' ? 'tabela' : 'kanban');
+
+  useEffect(() => {
+    if (paramView === 'tabela' || paramView === 'kanban') {
+      setModoVisualizacao(paramView);
+    }
+  }, [paramView]);
 
   // Ordens de Serviço
   const [ordens, setOrdens] = useState([]);
@@ -52,6 +63,14 @@ export const OrdersPage = () => {
 
   // Filtros
   const [busca, setBusca] = useState('');
+  const [buscaDebounced, setBuscaDebounced] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setBuscaDebounced(busca);
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [busca]);
   const [statusFiltro, setStatusFiltro] = useState('');
   const [tecnicoFiltro, setTecnicoFiltro] = useState('');
   const [exibirInativas, setExibirInativas] = useState(false);
@@ -249,7 +268,7 @@ export const OrdersPage = () => {
     try {
       setCarregando(true);
       const params = new URLSearchParams();
-      if (busca) params.append('busca', busca);
+      if (buscaDebounced) params.append('busca', buscaDebounced);
       if (statusFiltro) params.append('statusId', statusFiltro);
       if (tecnicoFiltro) params.append('tecnicoId', tecnicoFiltro);
 
@@ -287,7 +306,7 @@ export const OrdersPage = () => {
 
   useEffect(() => {
     buscarOrdens();
-  }, [busca, statusFiltro, tecnicoFiltro, filtrosAvancados, exibirInativas, pagina, modoVisualizacao]);
+  }, [buscaDebounced, statusFiltro, tecnicoFiltro, filtrosAvancados, exibirInativas, pagina, modoVisualizacao]);
 
   // Estrutura dinâmica das colunas do Kanban conforme o requisito:
   // Se um status específico for selecionado no dropdown "Todos os status", oculte todas as outras colunas
@@ -541,64 +560,62 @@ export const OrdersPage = () => {
 
       {/* Cabeçalho da Página */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Ordens de Serviço</h1>
-          <p className="text-sm text-slate-500">
-            Abertura de OS, triagem por tipo de reparo, esteira Kanban e controle de manutenção
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0D223A] text-white shadow-sm">
+            <ClipboardList className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-[#14253D]">Ordens de Serviço</h1>
+            <p className="text-sm text-[#437194]">
+              Abertura de OS, triagem por tipo de reparo, esteira Kanban e controle de manutenção
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Alternador de Exibição (View Switcher: Tabela / Kanban) */}
-          <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setModoVisualizacao('kanban')}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                modoVisualizacao === 'kanban'
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-              title="Visualização em quadro Kanban"
-            >
-              <Columns3 className="h-3.5 w-3.5" />
-              <span>Kanban</span>
-            </button>
+          {/* Alternador de Exibição (Quadro / Lista) da Imagem 3 */}
+          <ExpandableTabs
+            tabs={[
+              { title: "Quadro", icon: Columns3 },
+              { title: "Lista", icon: List },
+            ]}
+            selectedIndex={modoVisualizacao === 'kanban' ? 0 : 1}
+            onChange={(idx) => {
+              if (idx !== null) {
+                const novoModo = idx === 0 ? 'kanban' : 'tabela';
+                setModoVisualizacao(novoModo);
+                setSearchParams((prev) => {
+                  const next = new URLSearchParams(prev);
+                  next.set('view', novoModo);
+                  return next;
+                });
+              }
+            }}
+            activeColor="text-slate-900 font-bold"
+            className="border-slate-200 bg-white shadow-xs"
+          />
 
-            <button
-              type="button"
-              onClick={() => setModoVisualizacao('tabela')}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                modoVisualizacao === 'tabela'
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-              title="Visualização em lista tabular"
-            >
-              <List className="h-3.5 w-3.5" />
-              <span>Tabela</span>
-            </button>
-          </div>
-
-          {/* Botão de Filtros Avançados (RF09) */}
-          <button
-            type="button"
+          {/* Botão de Filtros Avançados com Animação Expansível */}
+          <ExpandableActionButton
+            icon={Filter}
+            label="Filtros Avançados"
+            isOpen={painelFiltrosAberto}
             onClick={() => setPainelFiltrosAberto(!painelFiltrosAberto)}
-            className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold shadow-2xs transition ${
-              painelFiltrosAberto || totalFiltrosAvancadosAtivos > 0
+            activeColor="border-[#0D223A] bg-[#0D223A] text-white shadow-xs"
+            inactiveColor={
+              totalFiltrosAvancadosAtivos > 0
                 ? 'border-blue-300 bg-blue-50 text-blue-700'
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300'
-            }`}
+            }
+            badge={
+              totalFiltrosAvancadosAtivos > 0 ? (
+                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white ml-1">
+                  {totalFiltrosAvancadosAtivos}
+                </span>
+              ) : null
+            }
             title="Abrir painel de filtros avançados combináveis"
-          >
-            <Filter className="h-3.5 w-3.5 shrink-0" />
-            <span>Filtros Avançados</span>
-            {totalFiltrosAvancadosAtivos > 0 && (
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white">
-                {totalFiltrosAvancadosAtivos}
-              </span>
-            )}
-          </button>
+          />
 
           {/* Botão "+ Nova Coluna / Status" */}
           {podeGerenciarColunas && (
@@ -608,7 +625,7 @@ export const OrdersPage = () => {
                 setColunaEmEdicao(null);
                 setModalColunaAberto(true);
               }}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition"
+              className="secondary-highlight-action"
               title="Criar nova etapa de status para o fluxo de OS"
             >
               <SlidersHorizontal className="h-3.5 w-3.5 text-slate-500" />
@@ -624,7 +641,7 @@ export const OrdersPage = () => {
                 setStatusCriacaoPredefinidoId(null);
                 setModalCriacaoAberto(true);
               }}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              className="primary-action"
             >
               <Plus className="h-4 w-4" />
               Nova Ordem de Serviço

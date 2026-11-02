@@ -14,7 +14,7 @@ import {
 import { OrderKanbanCard } from './OrderKanbanCard';
 import { verificarPermissaoDrop } from '../../utils/orderPermissions';
 
-export const OrderKanbanColumn = ({
+export const OrderKanbanColumn = React.memo(({
   coluna,
   cargo = '',
   verificarPermissao = null,
@@ -394,4 +394,4 @@ export const OrderKanbanColumn = ({
       </div>
     </div>
   );
-};
+});

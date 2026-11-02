@@ -80,7 +80,7 @@ export const App = () => {
               <Route path="equipamentos" element={<EquipmentsPage />} />
               <Route path="produtos" element={<ProductsPage />} />
               
-              {/* Rota de Usuarios protegida para perfil ADMIN */}
+              {/* Rota de Usuarios */}
               <Route
                 path="usuarios"
                 element={
@@ -126,3 +126,5 @@ export const App = () => {
     </AuthProvider>
   );
 };
+
+export default App;

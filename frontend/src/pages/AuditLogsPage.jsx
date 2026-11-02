@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useState, useEffect } from 'react';
 import {
   ShieldAlert,
@@ -19,6 +20,7 @@ import {
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Pagination } from '../components/common/Pagination';
+import { SearchableCombobox } from '../components/common/SearchableCombobox';
 
 export const AuditLogsPage = () => {
   const { ehAdmin, cargo } = useAuth();
@@ -183,7 +185,7 @@ export const AuditLogsPage = () => {
       {/* Cabeçalho da Página */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 text-white shadow-sm">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0D223A] text-white shadow-sm">
             <ShieldAlert className="h-5 w-5" />
           </div>
           <div>
@@ -196,12 +198,7 @@ export const AuditLogsPage = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs">
-            <Activity className="h-3.5 w-3.5 text-emerald-500" />
-            <span>Auditoria Ativa</span>
-          </span>
-        </div>
+
       </div>
 
       {/* Barra de Filtros por Período e Usuário */}
@@ -244,18 +241,15 @@ export const AuditLogsPage = () => {
             <label className="mb-1.5 block text-[11px] font-semibold text-slate-700">
               Usuário Responsável
             </label>
-            <select
-              value={usuarioFiltro}
-              onChange={(e) => setUsuarioFiltro(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-2 px-2.5 text-xs text-slate-700 transition focus:border-slate-400 focus:bg-white focus:outline-none"
-            >
-              <option value="">Todos os usuários</option>
-              {usuariosLista.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.nome} ({u.cargo || 'USUÁRIO'})
-                </option>
-              ))}
-            </select>
+            <SearchableCombobox
+              opcoes={usuariosLista}
+              valor={usuarioFiltro}
+              aoMudar={(val) => setUsuarioFiltro(val)}
+              placeholder="Todos os usuários"
+              labelKey="nome"
+              valueKey="id"
+              sublabelKey="cargo"
+            />
           </div>
 
           {/* 3. Período: Início */}
@@ -313,10 +307,7 @@ export const AuditLogsPage = () => {
             <RotateCcw className="h-3.5 w-3.5 text-slate-400" />
             Limpar
           </button>
-          <button
-            type="submit"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 transition"
-          >
+          <button type="submit" className="inline-flex items-center gap-1.5 rounded-lg bg-[#0D223A] hover:bg-[#081524] px-4 py-1.5 text-xs font-semibold text-white shadow-xs transition active:translate-y-px">
             <Search className="h-3.5 w-3.5" />
             Filtrar Auditoria
           </button>
@@ -437,12 +428,12 @@ export const AuditLogsPage = () => {
       </div>
 
       {/* Modal de Detalhes dos Dados Alterados (JSON Viewer) */}
-      {modalDetalheAberto && logSelecionado && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs animate-in fade-in duration-150">
+      {modalDetalheAberto && logSelecionado && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#0D223A]/60 p-4 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-150 max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0D223A] text-white">
                   <FileCode className="h-4 w-4" />
                 </div>
                 <div>
@@ -512,13 +503,14 @@ export const AuditLogsPage = () => {
                   setModalDetalheAberto(false);
                   setLogSelecionado(null);
                 }}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition"
+                className="rounded-lg bg-[#0D223A] hover:bg-[#081524] px-4 py-2 text-xs font-semibold text-white transition"
               >
                 Fechar
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

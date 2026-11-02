@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useState, useEffect } from 'react';
 import {
   X,
@@ -16,8 +17,6 @@ import {
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { EquipmentSearchModal } from '../common/EquipmentSearchModal';
-import { ClientSearchModal } from '../common/ClientSearchModal';
 import { SearchableCombobox } from '../common/SearchableCombobox';
 
 const TIPOS_REPARO = [
@@ -264,31 +263,8 @@ export const OrderCreateModal = ({ aberto, aoFechar, aoSucesso }) => {
 
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
-  const [modalPesquisaEquipamento, setModalPesquisaEquipamento] = useState(false);
-  const [modalPesquisaCliente, setModalPesquisaCliente] = useState(false);
-
-  const handleSelecionarClientePesquisa = (cli) => {
-    if (cli) {
-      setClientes((prev) => {
-        if (!prev.some((c) => String(c.id) === String(cli.id))) {
-          return [cli, ...prev];
-        }
-        return prev;
-      });
-      aoMudarCliente(cli.id);
-    }
-  };
-
+    
   const clienteSelecionado = clientes.find((c) => String(c.id) === String(clienteId));
-
-  const handleSelecionarEquipamentoPesquisa = (eq) => {
-    if (eq) {
-      if (eq.clienteId && String(eq.clienteId) !== String(clienteId)) {
-        setClienteId(eq.clienteId);
-      }
-      setEquipamentoId(eq.id);
-    }
-  };
 
   // Inicializa respostas com valores padrão conforme o tipo selecionado
   const inicializarRespostas = (codigoTipo) => {
@@ -345,7 +321,7 @@ export const OrderCreateModal = ({ aberto, aoFechar, aoSucesso }) => {
   };
 
   // Filtra equipamentos do cliente selecionado
-  const equipamentosDoCliente = equipamentos.filter((eq) => eq.clienteId === clienteId);
+  const equipamentosDoCliente = equipamentos.filter((eq) => String(eq.clienteId) === String(clienteId));
 
   // Redefine equipamento ao mudar de cliente
   const aoMudarCliente = (novoClienteId) => {
@@ -408,11 +384,12 @@ export const OrderCreateModal = ({ aberto, aoFechar, aoSucesso }) => {
 
   if (!aberto) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-2 sm:p-4 backdrop-blur-sm overflow-hidden">
-      <div className="relative flex flex-col w-full max-w-4xl lg:max-w-5xl max-h-[94vh] rounded-2xl bg-white shadow-2xl transition-all overflow-hidden border border-slate-100">
+  return typeof document !== 'undefined' ? createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#0D223A]/60 p-2 sm:p-4 backdrop-blur-sm overflow-hidden">
+
+      <div className="relative flex flex-col w-full max-w-4xl lg:max-w-5xl max-h-[94vh] rounded-2xl bg-[#DFE5EB] shadow-2xl transition-all overflow-hidden border border-[#C8D5E2]">
         {/* Cabeçalho Fixo do Modal */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6 flex-shrink-0 bg-white">
+        <div className="flex items-center justify-between border-b border-[#C8D5E2] px-5 py-4 sm:px-6 flex-shrink-0 bg-[#DFE5EB]">
           <div>
             <h2 className="text-lg sm:text-xl font-bold text-slate-900">Abertura de Ordem de Serviço</h2>
             <p className="text-xs text-slate-500">
@@ -422,7 +399,7 @@ export const OrderCreateModal = ({ aberto, aoFechar, aoSucesso }) => {
           <button
             type="button"
             onClick={aoFechar}
-            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-200/60 hover:text-slate-700"
             aria-label="Fechar"
           >
             <X className="h-5 w-5" />
@@ -443,9 +420,9 @@ export const OrderCreateModal = ({ aberto, aoFechar, aoSucesso }) => {
             <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
           </div>
         ) : (
-          <form id="form-abertura-os" onSubmit={aoEnviarFormulario} className="flex-1 overflow-y-auto px-5 py-5 sm:px-6 space-y-5">
+          <form id="form-abertura-os" onSubmit={aoEnviarFormulario} className="flex-1 overflow-y-auto px-5 py-5 sm:px-6 space-y-5 bg-[#DFE5EB]">
             {/* Seção 1: Identificação de Atendimento */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+            <div className="rounded-xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs">
               <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
                 <User className="h-4 w-4 text-blue-600" />
                 1. Identificação do Atendimento
@@ -465,29 +442,28 @@ export const OrderCreateModal = ({ aberto, aoFechar, aoSucesso }) => {
                   />
                 </div>
 
-                {/* Técnico inicial (opcional) */}
+                {/* Técnico inicial (opcional) com SearchableCombobox */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Técnico Pré-Atribuído (Opcional)
                   </label>
-                  <select
+                  <SearchableCombobox
                     value={tecnicoId}
-                    onChange={(e) => setTecnicoId(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-slate-500 focus:outline-none transition shadow-xs"
-                  >
-                    <option value="">Nenhum técnico atribuído no momento</option>
-                    {tecnicos.map((tec) => (
-                      <option key={tec.id} value={tec.id}>
-                        {tec.nome}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setTecnicoId}
+                    options={tecnicos || []}
+                    valueKey="id"
+                    labelKey="nome"
+                    sublabelKey="email"
+                    placeholder="Nenhum técnico atribuído no momento"
+                    searchPlaceholder="Buscar técnico..."
+                    icon={Wrench}
+                  />
                 </div>
               </div>
             </div>
 
-            {/* Seção 2: Cliente e Equipamento */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+            {/* Seção 2: Cliente e Equipamento com Combobox Otimizada e Busca Dinâmica */}
+            <div className="rounded-xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs">
               <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
                 <Cpu className="h-4 w-4 text-emerald-600" />
                 2. Cliente e Equipamento
@@ -497,70 +473,54 @@ export const OrderCreateModal = ({ aberto, aoFechar, aoSucesso }) => {
                 {/* Cliente */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">Cliente *</label>
-                  <select
-                    required
+                  <SearchableCombobox
                     value={clienteId}
-                    onChange={(e) => aoMudarCliente(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-slate-500 focus:outline-none transition shadow-xs"
-                  >
-                    <option value="">Selecione o cliente...</option>
-                    {clientes.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nome} {c.cpf ? `(CPF: ${c.cpf})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={aoMudarCliente}
+                    options={clientes || []}
+                    valueKey="id"
+                    labelKey="nome"
+                    sublabelKey="cpf"
+                    placeholder="Selecione o cliente..."
+                    searchPlaceholder="Buscar cliente por nome ou CPF..."
+                    icon={User}
+                  />
                 </div>
 
                 {/* Equipamento */}
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Equipamento Cadastrado *
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setModalPesquisaEquipamento(true)}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition"
-                      title="Abrir modal para pesquisar equipamentos"
-                    >
-                      <Search className="h-3 w-3" />
-                      <span>Pesquisa Avançada</span>
-                    </button>
-                  </div>
-                  <select
-                    required
-                    disabled={!clienteId}
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Equipamento Cadastrado *
+                  </label>
+                  <SearchableCombobox
                     value={equipamentoId}
-                    onChange={(e) => setEquipamentoId(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-slate-500 focus:outline-none disabled:bg-slate-100 disabled:text-slate-400 transition shadow-xs"
-                  >
-                    <option value="">
-                      {!clienteId
-                        ? 'Selecione um cliente primeiro'
-                        : equipamentosDoCliente.length === 0
-                        ? 'Nenhum equipamento cadastrado para este cliente'
-                        : 'Selecione o equipamento...'}
-                    </option>
-                    {equipamentosDoCliente.map((eq) => {
+                    onChange={setEquipamentoId}
+                    disabled={!clienteId}
+                    options={equipamentosDoCliente || []}
+                    valueKey="id"
+                    labelKey="descricao"
+                    formatLabel={(eq) => {
                       const marcaMod = [eq.marcaNome || eq.marca?.nome, eq.modeloNome || eq.modelo?.nome].filter(Boolean).join(' ');
                       const ident = eq.numeroSerie 
                         ? (/^\d+$/.test(String(eq.numeroSerie).trim()) ? `ID: ${eq.numeroSerie}` : `N/S: ${eq.numeroSerie}`)
                         : 'S/N';
-                      const titulo = marcaMod ? `${marcaMod} — ${ident}` : `${eq.descricao} — ${ident}`;
-                      return (
-                        <option key={eq.id} value={eq.id}>
-                          {titulo}
-                        </option>
-                      );
-                    })}
-                  </select>
+                      return marcaMod ? `${marcaMod} — ${ident}` : `${eq.descricao} — ${ident}`;
+                    }}
+                    placeholder={
+                      !clienteId
+                        ? 'Selecione um cliente primeiro'
+                        : equipamentosDoCliente.length === 0
+                        ? 'Nenhum equipamento cadastrado para este cliente'
+                        : 'Selecione o equipamento...'
+                    }
+                    searchPlaceholder="Buscar equipamento por modelo, marca ou serial..."
+                    icon={Laptop}
+                  />
                 </div>
               </div>
             </div>
 
             {/* Seção 3: Tipo de Reparo e Questionário Específico de Triagem (100% Flexível e Responsivo) */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+            <div className="rounded-xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs">
               <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
                 <HelpCircle className="h-4 w-4 text-purple-600" />
                 3. Tipo de Reparo e Questionário Específico de Triagem
@@ -577,9 +537,7 @@ export const OrderCreateModal = ({ aberto, aoFechar, aoSucesso }) => {
                       type="button"
                       onClick={() => aoMudarTipoReparo(item.codigo)}
                       className={`flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-xl border p-2.5 sm:p-3 transition text-center ${
-                        ativo
-                          ? 'border-slate-900 bg-slate-900 text-white shadow-sm ring-2 ring-slate-900/10'
-                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                        ativo ? 'border-[#0D223A] bg-[#0D223A] text-white shadow-sm ring-2 ring-[#0D223A]/10' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300'
                       }`}
                     >
                       <Icone className="h-5 w-5 shrink-0" />
@@ -648,7 +606,7 @@ export const OrderCreateModal = ({ aberto, aoFechar, aoSucesso }) => {
             </div>
 
             {/* Seção 4: Relato do Cliente e Observações */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+            <div className="rounded-xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs">
               <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
                 <FileText className="h-4 w-4 text-amber-600" />
                 4. Relato do Cliente e Observações de Entrada
@@ -687,7 +645,7 @@ export const OrderCreateModal = ({ aberto, aoFechar, aoSucesso }) => {
         )}
 
         {/* Rodapé Fixo de Ações do Modal */}
-        <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-5 py-4 sm:px-6 bg-slate-50/75 flex-shrink-0">
+        <div className="flex items-center justify-end gap-3 border-t border-[#C8D5E2] px-5 py-4 sm:px-6 bg-[#DFE5EB] flex-shrink-0">
           <button
             type="button"
             onClick={aoFechar}
@@ -699,24 +657,16 @@ export const OrderCreateModal = ({ aberto, aoFechar, aoSucesso }) => {
             type="submit"
             form="form-abertura-os"
             disabled={salvando || carregandoAuxiliares}
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
+            className="primary-action"
           >
             {salvando && <Loader2 className="h-4 w-4 animate-spin" />}
             Abrir Ordem de Serviço
           </button>
         </div>
       </div>
-
-      {/* Modal de Pesquisa Avançada de Equipamentos */}
-      <EquipmentSearchModal
-        aberto={modalPesquisaEquipamento}
-        aoFechar={() => setModalPesquisaEquipamento(false)}
-        aoSelecionar={handleSelecionarEquipamentoPesquisa}
-        clienteIdFiltro={clienteId || null}
-        clienteNomeFiltro={clienteSelecionado?.nome || ''}
-      />
-    </div>
-  );
+    </div>,
+    document.body
+  ) : null;
 };
 
 export default OrderCreateModal;

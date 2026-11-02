@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useState, useEffect } from 'react';
 import {
   X,
@@ -30,6 +31,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSocket } from '../../contexts/SocketContext';
 import { OrderTimeline } from './OrderTimeline';
 import { ProductSearchModal } from '../common/ProductSearchModal';
+import { ExpandableTabs } from '@/components/ui/expandable-tabs';
 
 export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => {
   const { usuario, ehAdmin, ehAtendente, ehTecnico, apenasTecnico, apenasAtendente } = useAuth();
@@ -481,8 +483,8 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
 
   if (!aberto) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-2 sm:p-4 backdrop-blur-sm overflow-hidden">
+  return typeof document !== 'undefined' ? createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#0D223A]/60 p-2 sm:p-4 backdrop-blur-sm overflow-hidden">
       <div className="relative flex flex-col w-full max-w-4xl lg:max-w-5xl max-h-[94vh] rounded-2xl bg-white shadow-2xl transition-all overflow-hidden border border-slate-100">
         {/* Topo do Master-Detail (Fixo) */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 px-5 py-4 sm:px-6 flex-shrink-0 bg-white">
@@ -557,7 +559,7 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
               <button
                 type="button"
                 onClick={aoFechar}
-                className="rounded-lg bg-slate-900 px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-slate-800 transition"
+                className="primary-action"
               >
                 Voltar para a Lista
               </button>
@@ -683,46 +685,27 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
               </div>
             </div>
 
-            {/* Abas de Navegação Responsivas */}
-            <div className="flex overflow-x-auto border-b border-slate-200 gap-1">
-              <button
-                type="button"
-                onClick={() => setAbaAtiva('triagem')}
-                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap shrink-0 transition ${
-                  abaAtiva === 'triagem'
-                    ? 'border-slate-900 text-slate-900'
-                    : 'border-transparent text-slate-400 hover:text-slate-700'
-                }`}
-              >
-                <FileText className="h-4 w-4 shrink-0" />
-                Geral e Laudo
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setAbaAtiva('evolucao')}
-                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap shrink-0 transition ${
-                  abaAtiva === 'evolucao'
-                    ? 'border-slate-900 text-slate-900'
-                    : 'border-transparent text-slate-400 hover:text-slate-700'
-                }`}
-              >
-                <History className="h-4 w-4 shrink-0" />
-                Evolução Técnica ({ordem.historico?.length || 0})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setAbaAtiva('pecas')}
-                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap shrink-0 transition ${
-                  abaAtiva === 'pecas'
-                    ? 'border-slate-900 text-slate-900'
-                    : 'border-transparent text-slate-400 hover:text-slate-700'
-                }`}
-              >
-                <Package className="h-4 w-4 shrink-0" />
-                Peças ({ordem.itens?.length || 0})
-              </button>
+            {/* Abas de Navegação Responsivas com ExpandableTabs */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <ExpandableTabs
+                tabs={[
+                  { title: "Geral e Laudo", icon: FileText },
+                  { title: `Evolução Técnica (${ordem?.historico?.length || 0})`, icon: History },
+                  { type: "separator" },
+                  { title: `Peças (${ordem?.itens?.length || 0})`, icon: Package },
+                ]}
+                selectedIndex={abaAtiva === 'triagem' ? 0 : abaAtiva === 'evolucao' ? 1 : 3}
+                onChange={(idx) => {
+                  if (idx === 0) setAbaAtiva('triagem');
+                  else if (idx === 1) setAbaAtiva('evolucao');
+                  else if (idx === 3) setAbaAtiva('pecas');
+                }}
+                activeColor="text-slate-900 font-semibold"
+                className="border-slate-200 bg-slate-50/70"
+              />
+              <span className="text-xs text-slate-400 font-medium hidden sm:inline-block">
+                Navegação da O.S.
+              </span>
             </div>
 
             {/* CONTEÚDO DA ABA 1: GERAL E LAUDO */}
@@ -797,7 +780,7 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
                         type="button"
                         onClick={aoSalvarLaudo}
                         disabled={salvandoLaudo}
-                        className="inline-flex items-center gap-1 rounded bg-slate-900 px-3 py-1 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded bg-[#0D223A] px-3 py-1 text-xs font-semibold text-white transition hover:bg-[#081524] disabled:opacity-50"
                       >
                         {salvandoLaudo ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
                         Salvar Laudo
@@ -1167,7 +1150,7 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
           <button
             type="button"
             onClick={aoFechar}
-            className="rounded-lg bg-slate-900 px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
+            className="rounded-lg bg-[#0D223A] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#081524]"
           >
             Fechar Detalhes
           </button>
@@ -1183,8 +1166,9 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
           setModalPesquisaPecaAberto(false);
         }}
       />
-    </div>
-  );
+    </div>,
+    document.body
+  ) : null;
 };
 
 export default OrderDetailModal;

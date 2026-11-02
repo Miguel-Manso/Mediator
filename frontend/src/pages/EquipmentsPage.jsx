@@ -1,3 +1,6 @@
+import { ExpandableActionButton } from '../components/ui/ExpandableActionButton';
+import { createPortal } from 'react-dom';
+import { SearchableCombobox } from '../components/common/SearchableCombobox';
 import React, { useState, useEffect } from 'react';
 import {
   Laptop,
@@ -25,7 +28,16 @@ export const EquipmentsPage = () => {
   const { ehAdmin, ehAtendente, apenasTecnico } = useAuth();
   const [equipamentos, setEquipamentos] = useState([]);
   const [busca, setBusca] = useState('');
+  const [buscaDebounced, setBuscaDebounced] = useState('');
   const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setBuscaDebounced(busca);
+      setPagina(1);
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [busca]);
 
   // Dados auxiliares para selects
   const [clientes, setClientes] = useState([]);
@@ -88,7 +100,7 @@ export const EquipmentsPage = () => {
     try {
       setCarregando(true);
       const params = new URLSearchParams();
-      if (busca) params.append('busca', busca);
+      if (buscaDebounced) params.append('busca', buscaDebounced);
       if (exibirInativos) params.append('incluirInativos', 'true');
       if (categoriaFiltro) params.append('categoriaId', categoriaFiltro);
       if (marcaFiltro) params.append('marcaId', marcaFiltro);
@@ -134,7 +146,7 @@ export const EquipmentsPage = () => {
 
   useEffect(() => {
     buscarEquipamentos();
-  }, [busca, exibirInativos, categoriaFiltro, marcaFiltro, pagina, orderBy, orderDirection]);
+  }, [buscaDebounced, exibirInativos, categoriaFiltro, marcaFiltro, pagina, orderBy, orderDirection]);
 
   const abrirModalCriacao = () => {
     setErroFormulario('');
@@ -238,17 +250,23 @@ export const EquipmentsPage = () => {
     <div className="page-shell">
       {/* Cabeçalho */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="page-title">Equipamentos</h1>
-          <p className="page-subtitle">Controle de aparelhos e dispositivos vinculados aos clientes</p>
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0D223A] text-white shadow-sm">
+            <Laptop className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="page-title">Equipamentos</h1>
+            <p className="page-subtitle">Controle de aparelhos e dispositivos vinculados aos clientes</p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setMostrarModalParametros(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 active:translate-y-px"
+            className="inline-flex h-9 sm:h-10 items-center justify-center gap-2 rounded-xl border border-[#0D223A] bg-[#0D223A] px-4 text-xs font-semibold text-white shadow-xs hover:bg-[#081524] transition-colors select-none cursor-pointer"
+            title="Parâmetro de Equipamento"
           >
-            <Sliders className="w-4 h-4 text-slate-600" />
+            <Sliders className="h-4 w-4 shrink-0" />
             <span>Parâmetro de Equipamento</span>
           </button>
           <button onClick={abrirModalCriacao} className="primary-action">
@@ -275,42 +293,38 @@ export const EquipmentsPage = () => {
           />
         </div>
 
-        {/* Filtro por Categoria */}
-        <div className="w-full sm:w-auto lg:w-52">
-          <select
+        {/* Filtro por Categoria (Image 5) */}
+        <div className="w-full sm:w-auto lg:w-56">
+          <SearchableCombobox
             value={categoriaFiltro}
-            onChange={(e) => {
-              setCategoriaFiltro(e.target.value);
+            onChange={(val) => {
+              setCategoriaFiltro(val);
               setPagina(1);
             }}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs text-slate-700 shadow-xs focus:border-slate-400 focus:outline-none transition"
-          >
-            <option value="">Todas as Categorias</option>
-            {categorias.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.nome}
-              </option>
-            ))}
-          </select>
+            options={categorias || []}
+            valueKey="id"
+            labelKey="nome"
+            placeholder="Todas as Categorias"
+            searchPlaceholder="Buscar categoria..."
+            buttonClassName="py-2.5 px-3 rounded-xl border border-slate-200 shadow-xs"
+          />
         </div>
 
         {/* Filtro por Marca */}
-        <div className="w-full sm:w-auto lg:w-52">
-          <select
+        <div className="w-full sm:w-auto lg:w-56">
+          <SearchableCombobox
             value={marcaFiltro}
-            onChange={(e) => {
-              setMarcaFiltro(e.target.value);
+            onChange={(val) => {
+              setMarcaFiltro(val);
               setPagina(1);
             }}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs text-slate-700 shadow-xs focus:border-slate-400 focus:outline-none transition"
-          >
-            <option value="">Todas as Marcas</option>
-            {marcas.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.nome}
-              </option>
-            ))}
-          </select>
+            options={marcas || []}
+            valueKey="id"
+            labelKey="nome"
+            placeholder="Todas as Marcas"
+            searchPlaceholder="Buscar marca..."
+            buttonClassName="py-2.5 px-3 rounded-xl border border-slate-200 shadow-xs"
+          />
         </div>
 
         <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-600 bg-white border border-slate-200 px-3.5 py-3 rounded-xl shadow-xs hover:bg-slate-50 transition shrink-0">
@@ -473,9 +487,10 @@ export const EquipmentsPage = () => {
         )}
       </div>
 
-      {/* Modal de Cadastro / Edição */}
-      {mostrarModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+      {/* Modal de Cadastro / Edição via Portal */}
+      {mostrarModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#0D223A]/60 p-4 backdrop-blur-xs">
+
           <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-xl animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-semibold text-slate-900 mb-4">
               {estaEditando ? 'Editar Equipamento' : 'Novo Equipamento'}
@@ -492,84 +507,73 @@ export const EquipmentsPage = () => {
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Cliente Proprietário *
                 </label>
-                <select
+                <SearchableCombobox
                   value={clienteId}
-                  onChange={(e) => setClienteId(e.target.value)}
-                  required
-                  className="form-control"
-                >
-                  <option value="">Selecione um cliente...</option>
-                  {clientes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nome} {c.cpf ? `(${c.cpf})` : ''}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setClienteId}
+                  options={clientes || []}
+                  valueKey="id"
+                  labelKey="nome"
+                  sublabelKey="cpf"
+                  placeholder="Selecione um cliente..."
+                  searchPlaceholder="Buscar cliente por nome ou CPF..."
+                />
               </div>
 
+              {/* Image 3: Categoria de Equipamento */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Categoria de Equipamento *
                 </label>
-                <select
+                <SearchableCombobox
                   value={categoriaId}
-                  onChange={(e) => setCategoriaId(e.target.value)}
-                  required
-                  className="form-control"
-                >
-                  <option value="">Selecione uma categoria...</option>
-                  {categorias.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.nome}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setCategoriaId}
+                  options={categorias || []}
+                  valueKey="id"
+                  labelKey="nome"
+                  placeholder="Selecione uma categoria..."
+                  searchPlaceholder="Buscar categoria..."
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Marca */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Marca
                   </label>
-                  <select
+                  <SearchableCombobox
                     value={marcaId}
-                    onChange={(e) => {
-                      setMarcaId(e.target.value);
+                    onChange={(val) => {
+                      setMarcaId(val);
                       setModeloId('');
                     }}
-                    className="form-control"
-                  >
-                    <option value="">Selecione a marca...</option>
-                    {marcas.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.nome}
-                      </option>
-                    ))}
-                  </select>
+                    options={marcas || []}
+                    valueKey="id"
+                    labelKey="nome"
+                    placeholder="Selecione a marca..."
+                    searchPlaceholder="Buscar marca..."
+                  />
                 </div>
 
+                {/* Image 4: Modelo */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Modelo
                   </label>
-                  <select
+                  <SearchableCombobox
                     value={modeloId}
-                    onChange={(e) => setModeloId(e.target.value)}
+                    onChange={setModeloId}
                     disabled={!marcaId}
-                    className="form-control disabled:bg-slate-50 disabled:text-slate-400"
-                  >
-                    <option value="">
-                      {marcaId ? 'Selecione o modelo...' : 'Escolha a marca primeiro'}
-                    </option>
-                    {modelosFiltrados.map((mod) => (
-                      <option key={mod.id} value={mod.id}>
-                        {mod.nome}
-                      </option>
-                    ))}
-                  </select>
+                    options={modelosFiltrados || []}
+                    valueKey="id"
+                    labelKey="nome"
+                    placeholder={marcaId ? 'Selecione o modelo...' : 'Escolha a marca primeiro'}
+                    searchPlaceholder="Buscar modelo..."
+                  />
                 </div>
               </div>
 
+              {/* Descrição / Problema Inicial */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Descrição / Problema Inicial *
@@ -639,7 +643,8 @@ export const EquipmentsPage = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Modal de Parâmetros de Equipamento (Categorias, Marcas e Modelos) */}

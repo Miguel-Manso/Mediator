@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
@@ -105,8 +106,8 @@ export const EquipmentSearchModal = ({
 
   if (!aberto) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150">
+  return typeof document !== 'undefined' ? createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#0D223A]/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150">
       <div
         role="dialog"
         aria-modal="true"
@@ -287,8 +288,9 @@ export const EquipmentSearchModal = ({
           </button>
         </div>
       </div>
-    </div>
-  );
+    </div>,
+    document.body
+  ) : null;
 };
 
 export default EquipmentSearchModal;

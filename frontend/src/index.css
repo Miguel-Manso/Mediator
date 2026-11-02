@@ -5,15 +5,33 @@
 @layer base {
   :root {
     color-scheme: light;
-    --canvas: #f4f5f7;
+    /* Imagem 2 - Design System Tokens */
+    --primary: 211 45% 30%;        /* #2A4B6E (Primary Deep Slate Blue) */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 24 76% 50%;       /* #DE6C20 (Secondary Warm Orange) */
+    --secondary-foreground: 0 0% 100%;
+    --tertiary: 206 38% 42%;       /* #437194 (Tertiary Steel Blue) */
+    --neutral: 215 51% 16%;        /* #14253D (Neutral Dark Navy Ink) */
+    
+    --background: 210 20% 90%;     /* #F0F4F8 (Canvas suave) */
+    --foreground: 215 51% 16%;     /* #14253D */
+    --card: 0 0% 100%;
+    --card-foreground: 215 51% 16%;
+    --muted: 208 44% 93%;          /* #E4EDF5 */
+    --muted-foreground: 209 26% 45%;/* #557390 */
+    --border: 210 42% 87%;         /* #D2DFEC */
+    --input: 210 42% 87%;
+    --ring: 211 45% 30%;
+    
+    --canvas: #dfe5eb;
     --surface: #ffffff;
-    --surface-muted: #f8f9fb;
-    --line: #dfe3e8;
-    --ink: #20252b;
-    --muted: #68717c;
-    --accent: #315f8c;
-    --accent-soft: #e9f0f7;
-    --danger: #a33b43;
+    --surface-muted: #e4edf5;
+    --line: #d2dfec;
+    --ink: #14253d;
+    --accent: #2a4b6e;
+    --accent-soft: #e8f0f7;
+    --brand-orange: #de6c20;
+    --danger: #c53030;
   }
 
   * {
@@ -28,7 +46,7 @@
     margin: 0;
     background: var(--canvas);
     color: var(--ink);
-    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-family: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
 
@@ -38,6 +56,16 @@
   textarea {
     font: inherit;
   }
+
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.8;
+    filter: brightness(0.35);
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+  }
+
 }
 
 ::-webkit-scrollbar {
@@ -50,12 +78,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c3c9d1;
-  border-radius: 2px;
+  background: #b5c7d8;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca5af;
+  background: #8fa7be;
 }
 
 @layer components {
@@ -64,19 +92,140 @@
   }
 
   .page-title {
-    @apply text-[1.7rem] font-semibold tracking-[-0.02em] text-slate-800;
+    @apply text-[1.7rem] font-bold tracking-[-0.02em] text-[#14253D];
   }
 
   .page-subtitle {
-    @apply mt-1 text-sm text-slate-500;
+    @apply mt-1 text-sm text-[#437194];
   }
 
-  .primary-action {
-    @apply inline-flex items-center justify-center gap-2 rounded-md bg-slate-800 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 active:translate-y-px;
+  /* =========================================================================
+     BOTÕES ESTILO UIVERSE.IO (Animados com expansão circular e cores Imagem 2)
+     ========================================================================= */
+  .primary-action,
+  .btn-uiverse-primary {
+    --color: #2A4B6E;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    position: relative;
+    cursor: pointer;
+    overflow: hidden;
+    border: 2px solid var(--color);
+    transition: color 0.5s ease, border-color 0.5s ease, box-shadow 0.3s ease;
+    z-index: 1;
+    font-size: 0.875rem;
+    border-radius: 8px;
+    font-weight: 600;
+    color: var(--color);
+    background: transparent;
+    padding: 0.55rem 1.25rem;
+    outline: none;
+  }
+
+  .primary-action::before,
+  .btn-uiverse-primary::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    background: var(--color);
+    height: 520px;
+    width: 520px;
+    border-radius: 50%;
+    top: 130%;
+    left: 130%;
+    transform: translate(0, 0);
+    transition: all 0.95s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .primary-action:hover,
+  .btn-uiverse-primary:hover {
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(42, 75, 110, 0.25);
+  }
+
+  .primary-action:hover::before,
+  .btn-uiverse-primary:hover::before {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .primary-action:active::before,
+  .btn-uiverse-primary:active::before {
+    background: #14253D;
+    transition: background 0s;
+  }
+
+  .primary-action:disabled,
+  .btn-uiverse-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  /* Variante Secundária Uiverse (Laranja Imagem 2: #DE6C20) */
+  .secondary-highlight-action,
+  .btn-uiverse-secondary {
+    --color: #DE6C20;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    position: relative;
+    cursor: pointer;
+    overflow: hidden;
+    border: 2px solid var(--color);
+    transition: color 0.5s ease, border-color 0.5s ease, box-shadow 0.3s ease;
+    z-index: 1;
+    font-size: 0.875rem;
+    border-radius: 8px;
+    font-weight: 600;
+    color: var(--color);
+    background: transparent;
+    padding: 0.55rem 1.25rem;
+    outline: none;
+  }
+
+  .secondary-highlight-action::before,
+  .btn-uiverse-secondary::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    background: var(--color);
+    height: 520px;
+    width: 520px;
+    border-radius: 50%;
+    top: 130%;
+    left: 130%;
+    transform: translate(0, 0);
+    transition: all 0.95s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .secondary-highlight-action:hover,
+  .btn-uiverse-secondary:hover {
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(222, 108, 32, 0.25);
+  }
+
+  .secondary-highlight-action:hover::before,
+  .btn-uiverse-secondary:hover::before {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .secondary-highlight-action:active::before,
+  .btn-uiverse-secondary:active::before {
+    background: #B55010;
+    transition: background 0s;
   }
 
   .secondary-action {
-    @apply inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-medium transition-transform active:translate-y-px disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-[#D2DFEC] bg-white px-4 py-2.5 text-sm font-medium text-[#14253D] transition-all hover:bg-[#F0F5FA] hover:border-[#2A4B6E]/40 active:translate-y-px disabled:opacity-50;
   }
 
   .badge {
@@ -85,54 +234,73 @@
 
   .search-control,
   .form-control {
-    @apply border border-slate-300 bg-white text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200;
+    @apply border border-[#D2DFEC] bg-white text-[#14253D] outline-none transition-colors placeholder:text-[#557390]/60 focus:border-[#2A4B6E] focus:ring-2 focus:ring-[#2A4B6E]/20;
   }
 
   .search-control {
-    @apply w-full rounded-md py-3 pl-10 pr-4 text-sm;
+    @apply w-full rounded-lg py-2.5 pl-10 pr-4 text-sm;
   }
 
   .form-control {
-    @apply w-full rounded-md px-3.5 py-2.5 text-sm;
+    @apply w-full rounded-lg px-3.5 py-2 text-sm;
   }
 
   .table-shell {
-    @apply overflow-hidden rounded-lg border border-slate-200 bg-white;
+    @apply overflow-hidden rounded-xl border border-[#D2DFEC] bg-white shadow-sm;
+  }
+
+  .table-shell thead th {
+    @apply bg-[#F0F5FA] text-[#14253D] font-semibold text-xs tracking-wider border-b border-[#D2DFEC];
   }
 
   .table-shell tbody tr {
-    @apply transition-colors hover:bg-slate-50;
+    @apply transition-colors hover:bg-[#F5F8FB];
   }
 
   .icon-action {
-    @apply rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300;
+    @apply rounded-lg p-2 text-[#437194] transition-colors hover:bg-[#E8F0F7] hover:text-[#2A4B6E] focus:outline-none focus:ring-2 focus:ring-[#2A4B6E]/30;
   }
 
   .modal-backdrop {
-    @apply fixed inset-0 z-50 flex items-center justify-center bg-slate-900/35 p-4;
+    @apply fixed inset-0 z-50 flex items-center justify-center bg-[#14253D]/45 backdrop-blur-sm p-4;
   }
 
   .modal-panel {
-    @apply max-h-[90vh] w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.14)];
+    @apply max-h-[90vh] w-full overflow-y-auto rounded-xl border border-[#D2DFEC] bg-white p-6 shadow-[0_20px_50px_rgba(20,37,61,0.18)];
   }
 }
 
-
-/* Regras Globais de Impressão (Paginação sem corte de conteúdo) */
+/* Regras Globais de Impressão */
 @media print {
   @page {
-    margin: 12mm 10mm;
+    margin: 0;
     size: auto;
   }
 
   html,
-  body,
   #root {
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
     overflow: visible !important;
     background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 11px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 11px !important;
+    padding: 12mm 10mm !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .print\:hidden,
@@ -140,11 +308,6 @@
   header,
   nav {
     display: none !important;
-  }
-
-  main,
-  div {
-    max-height: none !important;
   }
 
   main {
@@ -158,14 +321,19 @@
   }
 
   .print-avoid-break,
-  .print\:break-inside-avoid {
+  .print\:break-inside-avoid,
+  .report-group-card {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+    display: block !important;
+    overflow: visible !important;
+    margin-bottom: 12px !important;
   }
 
   table {
     width: 100% !important;
     border-collapse: collapse !important;
+    table-layout: fixed !important;
   }
 
   tr {
@@ -175,5 +343,82 @@
 
   thead {
     display: table-header-group !important;
+  }
+
+  td, th {
+    overflow: hidden !important;
+    word-wrap: break-word !important;
+    word-break: normal !important;
+  }
+}
+
+
+/* Cor da sidebar #0D223A para botões, ícones e backgrounds escuros */
+.bg-slate-900,
+button.bg-slate-900,
+div.bg-slate-900 {
+  background-color: #0D223A !important;
+}
+
+/* Animações Aurora Background (Luzes do Norte & Estrelas) */
+@keyframes twinkle {
+  0% {
+    opacity: 0.2;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0.95;
+    transform: scale(1.25);
+  }
+}
+
+@keyframes aurora-drift-1 {
+  0% {
+    transform: translate(0px, 0px) rotate(0deg) scale(1);
+  }
+  50% {
+    transform: translate(60px, 35px) rotate(12deg) scale(1.15);
+  }
+  100% {
+    transform: translate(-35px, 70px) rotate(-10deg) scale(0.95);
+  }
+}
+
+@keyframes aurora-drift-2 {
+  0% {
+    transform: translate(0px, 0px) rotate(0deg) scale(1);
+  }
+  50% {
+    transform: translate(-65px, -35px) rotate(-12deg) scale(1.1);
+  }
+  100% {
+    transform: translate(45px, 45px) rotate(16deg) scale(0.9);
+  }
+}
+
+@keyframes aurora-drift-3 {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  50% {
+    transform: translate(-45px, -55px) scale(1.18);
+  }
+  100% {
+    transform: translate(45px, -25px) scale(0.95);
+  }
+}
+
+@keyframes aurora-pulse {
+  0% {
+    opacity: 0.35;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.18);
+  }
+  100% {
+    opacity: 0.35;
+    transform: scale(0.9);
   }
 }

@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useState } from 'react';
 import { X, AlertTriangle, ArrowRight, ShieldAlert, Loader2, CheckCircle2 } from 'lucide-react';
 
@@ -41,8 +42,8 @@ export const OrderInactivateColumnModal = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
+  return typeof document !== 'undefined' ? createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-[#0D223A]/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl transition-all">
         {/* Topo */}
         <div className="flex items-start justify-between">
@@ -181,6 +182,7 @@ export const OrderInactivateColumnModal = ({
           </button>
         </div>
       </div>
-    </div>
-  );
+    </div>,
+    document.body
+  ) : null;
 };

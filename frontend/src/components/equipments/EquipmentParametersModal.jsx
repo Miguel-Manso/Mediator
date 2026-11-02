@@ -1,3 +1,5 @@
+import { createPortal } from 'react-dom';
+import { SearchableCombobox } from '../common/SearchableCombobox';
 import React, { useState } from 'react';
 import {
   X,
@@ -131,8 +133,9 @@ export const EquipmentParametersModal = ({
     ? modelos.filter((m) => String(m.marcaId || m.marca_id) === String(marcaSelecionadaId))
     : [];
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-2 sm:p-4 backdrop-blur-sm">
+  return typeof document !== 'undefined' ? createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#0D223A]/60 p-2 sm:p-4 backdrop-blur-sm">
+
       <div className="w-full max-w-2xl rounded-2xl bg-white p-4 sm:p-6 shadow-2xl transition-all max-h-[92vh] overflow-y-auto">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -238,7 +241,7 @@ export const EquipmentParametersModal = ({
                 <button
                   type="submit"
                   disabled={salvandoCategoria || !nomeCategoria.trim()}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50 shrink-0"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#0D223A] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#081524] disabled:opacity-50 shrink-0"
                 >
                   {salvandoCategoria ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                   Adicionar
@@ -283,7 +286,7 @@ export const EquipmentParametersModal = ({
                 <button
                   type="submit"
                   disabled={salvandoMarca || !nomeMarca.trim()}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50 shrink-0"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#0D223A] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#081524] disabled:opacity-50 shrink-0"
                 >
                   {salvandoMarca ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                   Adicionar
@@ -321,21 +324,18 @@ export const EquipmentParametersModal = ({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">Marca Pai *</label>
-                  <select
+                  <SearchableCombobox
                     value={marcaSelecionadaId}
-                    onChange={(e) => {
-                      setMarcaSelecionadaId(e.target.value);
+                    onChange={(val) => {
+                      setMarcaSelecionadaId(val);
                       limparMensagens();
                     }}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-slate-500 focus:outline-none"
-                  >
-                    <option value="">Selecione a marca...</option>
-                    {marcas.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.nome}
-                      </option>
-                    ))}
-                  </select>
+                    options={marcas || []}
+                    valueKey="id"
+                    labelKey="nome"
+                    placeholder="Selecione a marca..."
+                    searchPlaceholder="Buscar marca..."
+                  />
                 </div>
 
                 <div>
@@ -352,7 +352,7 @@ export const EquipmentParametersModal = ({
                     <button
                       type="submit"
                       disabled={salvandoModelo || !nomeModelo.trim() || !marcaSelecionadaId}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50 shrink-0"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#0D223A] px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#081524] disabled:opacity-50 shrink-0"
                     >
                       {salvandoModelo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                       Salvar
@@ -401,14 +401,15 @@ export const EquipmentParametersModal = ({
           <button
             type="button"
             onClick={aoFechar}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
+            className="rounded-lg bg-[#0D223A] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#081524]"
           >
             Concluir e Fechar
           </button>
         </div>
       </div>
-    </div>
-  );
+    </div>,
+    document.body
+  ) : null;
 };
 
 export default EquipmentParametersModal;

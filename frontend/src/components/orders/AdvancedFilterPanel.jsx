@@ -77,8 +77,7 @@ export const AdvancedFilterPanel = ({
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-12 items-end">
         {/* 1. Cliente com Busca Otimizada */}
         <div className="xl:col-span-2">
-          <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-            <User className="h-3 w-3 text-slate-400 shrink-0" />
+          <label className="mb-1.5 block text-[11px] font-semibold text-slate-700">
             Cliente
           </label>
           <SearchableCombobox
@@ -96,8 +95,7 @@ export const AdvancedFilterPanel = ({
 
         {/* 2. Técnico com Busca Otimizada */}
         <div className="xl:col-span-2">
-          <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-            <Wrench className="h-3 w-3 text-slate-400 shrink-0" />
+          <label className="mb-1.5 block text-[11px] font-semibold text-slate-700">
             Técnico
           </label>
           <SearchableCombobox
@@ -114,8 +112,7 @@ export const AdvancedFilterPanel = ({
 
         {/* 3. Atendente com Busca Otimizada */}
         <div className="xl:col-span-2">
-          <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-            <UserCheck className="h-3 w-3 text-slate-400 shrink-0" />
+          <label className="mb-1.5 block text-[11px] font-semibold text-slate-700">
             Atendente
           </label>
           <SearchableCombobox
@@ -132,8 +129,7 @@ export const AdvancedFilterPanel = ({
 
         {/* 4. Tipo de Serviço / Reparo */}
         <div className="xl:col-span-2">
-          <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-            <Tag className="h-3 w-3 text-slate-400 shrink-0" />
+          <label className="mb-1.5 block text-[11px] font-semibold text-slate-700">
             Tipo de Serviço
           </label>
           <input
@@ -161,8 +157,7 @@ export const AdvancedFilterPanel = ({
 
         {/* 5. Status da OS com Busca Otimizada e Cor */}
         <div className="xl:col-span-2">
-          <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-            <CheckCircle2 className="h-3 w-3 text-slate-400 shrink-0" />
+          <label className="mb-1.5 block text-[11px] font-semibold text-slate-700">
             Status da OS
           </label>
           <SearchableCombobox
@@ -181,8 +176,7 @@ export const AdvancedFilterPanel = ({
 
         {/* 6. Período de Entrada (Início / Fim) */}
         <div className="sm:col-span-2 lg:col-span-1 xl:col-span-2">
-          <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-            <Calendar className="h-3 w-3 text-slate-400 shrink-0" />
+          <label className="mb-1.5 block text-[11px] font-semibold text-slate-700">
             Data de Entrada
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

@@ -1,5 +1,6 @@
+import { createPortal } from 'react-dom';
 import React, { useState, useEffect } from 'react';
-import { UserCheck, Search, Plus, Mail, Shield, Loader2, Edit, UserX, MapPin } from 'lucide-react';
+import { Users, UserCheck, Search, Plus, Mail, Shield, Loader2, Edit, UserX, MapPin } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { maskCPF, maskPhone, maskCEP } from '../utils/masks';
@@ -198,19 +199,28 @@ export const UsersPage = () => {
     }
   };
 
-  const usuariosFiltrados = usuarios.filter((u) => {
-    const termo = busca.toLowerCase();
-    const nomeU = (u.nome || u.name || '').toLowerCase();
-    const emailU = (u.email || '').toLowerCase();
-    const cpfU = (u.cpf || '').toLowerCase();
-    return nomeU.includes(termo) || emailU.includes(termo) || cpfU.includes(termo);
-  });
+  const usuariosFiltrados = React.useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    if (!termo) return usuarios;
+    return usuarios.filter((u) => {
+      const nomeU = (u.nome || u.name || '').toLowerCase();
+      const emailU = (u.email || '').toLowerCase();
+      const cpfU = (u.cpf || '').toLowerCase();
+      return nomeU.includes(termo) || emailU.includes(termo) || cpfU.includes(termo);
+    });
+  }, [usuarios, busca]);
 
   return (
     <div className="page-shell">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="page-title">Usuários</h1>
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0D223A] text-white shadow-sm">
+            <Users className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="page-title">Usuários</h1>
+            <p className="page-subtitle">Gestão de colaboradores, perfis e permissões de acesso</p>
+          </div>
         </div>
         <button
           onClick={abrirModalCriacao}
@@ -363,8 +373,9 @@ export const UsersPage = () => {
       </div>
 
       {/* Modal de Cadastro / Edicao de Usuario */}
-      {mostrarModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+      {mostrarModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#0D223A]/60 p-4 backdrop-blur-xs">
+
           <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-xl animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-semibold text-slate-900 mb-4">
               {estaEditando ? 'Editar Usuário' : 'Novo Usuário'}
@@ -653,7 +664,8 @@ export const UsersPage = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

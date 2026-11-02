@@ -1,134 +1,269 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Users,
   Laptop,
   Package,
   UserCheck,
-  Wrench,
   LogOut,
   ClipboardList,
-  Sliders,
-  X,
   BarChart3,
   ShieldAlert,
-} from 'lucide-react';
+  X,
+  Columns3,
+  List,
+  } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  AnimatedSidebar,
+  AnimatedSidebarClose,
+  AnimatedSidebarContent,
+  AnimatedSidebarFooter,
+  AnimatedSidebarGroup,
+  AnimatedSidebarGroupContent,
+  AnimatedSidebarGroupLabel,
+  AnimatedSidebarHeader,
+  AnimatedSidebarMenu,
+  AnimatedSidebarMenuButton,
+  AnimatedSidebarMenuItem,
+  AnimatedSidebarMenuSub,
+  AnimatedSidebarMenuSubButton,
+  AnimatedSidebarMenuSubItem,
+  AnimatedSidebarRail,
+} from './ui/animated-sidebar';
 
-const itensMenu = [
-  { nome: 'Ordens de Serviço', caminho: '/ordens-servico', icone: ClipboardList },
-  { nome: 'Clientes', caminho: '/clientes', icone: Users },
-  { nome: 'Equipamentos', caminho: '/equipamentos', icone: Laptop },
-  { nome: 'Produtos', caminho: '/produtos', icone: Package },
-  { nome: 'Relatórios', caminho: '/relatorios', icone: BarChart3 },
-  { nome: 'Usuários', caminho: '/usuarios', icone: UserCheck, requerAdmin: true },
-  { nome: 'Auditoria', caminho: '/auditoria', icone: ShieldAlert, requerAdmin: true },
-];
-
-export const Sidebar = ({ aberta, aoFechar }) => {
+export const Sidebar = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { usuario, user, sair, signOut, ehAdmin, cargo } = useAuth();
   const usuarioAtual = usuario || user;
   const acaoSair = sair || signOut;
 
-  const nomeExibicao = usuarioAtual?.nome || usuarioAtual?.name || 'Usuário';
-  const cargoExibicao = cargo || 'ATENDENTE';
+  const nomeExibicao = usuarioAtual?.nome || usuarioAtual?.name || 'Administrador Rocha Magazine';
+  const cargoExibicao = cargo || usuarioAtual?.cargo || 'ADMIN';
+  const cargoFormatado =
+    cargoExibicao === 'ADMIN'
+      ? 'Administrador'
+      : cargoExibicao === 'TECNICO'
+      ? 'Técnico Especialista'
+      : 'Atendente';
 
-  // Ocultar menus exclusivos (Status da OS e Usuários apenas para ADMIN)
-  const itensVisiveis = itensMenu.filter((item) => !item.requerAdmin || ehAdmin);
+  const iniciaisUsuario = nomeExibicao
+    .split(' ')
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join('')
+    .toUpperCase() || 'AR';
+
+  const rotaAtual = location.pathname;
+  const currentView = searchParams.get('view') || 'kanban';
+
+  const [secaoAberta, setSecaoAberta] = useState(
+    rotaAtual.includes('/ordens-servico') ? 'Ordens de Serviço' : null
+  );
 
   return (
-    <>
-      {/* Backdrop para mobile */}
-      {aberta && (
-        <div
-          className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm transition-opacity md:hidden print:hidden"
-          onClick={aoFechar}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Menu Lateral (Drawer no Mobile / Fixo no Desktop) */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-full w-64 flex-col justify-between border-r border-slate-200 bg-white p-4 transition-transform duration-200 ease-in-out md:static md:h-screen md:w-60 md:flex-shrink-0 md:translate-x-0 print:hidden ${
-          aberta ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
-        }`}
-      >
-        <div>
-          {/* Cabeçalho da Sidebar */}
-          <div className="mb-6 flex items-center justify-between px-2 py-2">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white shadow-sm">
-                <Wrench className="h-4 w-4" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold leading-tight text-slate-900">Mediator</h2>
-                <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">
-                  Assistência Técnica
-                </span>
-              </div>
-            </div>
-
-            {/* Botão fechar apenas no mobile */}
-            <button
-              onClick={aoFechar}
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 md:hidden"
-              aria-label="Fechar menu"
-            >
-              <X className="h-5 w-5" />
-            </button>
+    <AnimatedSidebar
+      ariaLabel="Mediator Navegação"
+      collapsible="icon"
+      className="h-screen max-h-screen overflow-hidden bg-[#0D223A] border-r border-[#1B3654] text-white font-sans shrink-0"
+      panelClassName="h-screen max-h-screen flex flex-col justify-between overflow-hidden bg-[#0D223A] border-r border-[#1B3654] text-white"
+    >
+      {/* Cabeçalho da Sidebar */}
+      <AnimatedSidebarHeader className="p-3 pb-2 border-b border-[#1B3654]/80 shrink-0">
+        <div className="flex min-h-12 items-center gap-3 overflow-hidden px-1">
+          <img
+            src="/logo.png"
+            alt="Mediator Logo"
+            className="h-9 w-9 shrink-0 object-contain drop-shadow-sm"
+          />
+          <div className="min-w-0 flex-1 group-data-[state=collapsed]/sidebar:hidden">
+            <span className="block truncate text-base font-extrabold tracking-tight text-white leading-tight">
+              MEDIATOR
+            </span>
           </div>
-
-          {/* Links de Navegação */}
-          <nav className="space-y-1">
-            {itensVisiveis.map((item) => {
-              const Icone = item.icone;
-              return (
-                <NavLink
-                  key={item.caminho}
-                  to={item.caminho}
-                  onClick={() => {
-                    if (aoFechar) aoFechar();
-                  }}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-                      isActive
-                        ? 'bg-slate-900 font-semibold text-white shadow-sm'
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                    }`
-                  }
-                >
-                  <Icone className="h-4 w-4 shrink-0" />
-                  <span>{item.nome}</span>
-                </NavLink>
-              );
-            })}
-          </nav>
+          <AnimatedSidebarClose className="ml-auto text-[#8FAFC7] hover:bg-[#163252] hover:text-white md:hidden">
+            <X aria-hidden="true" className="size-4" />
+          </AnimatedSidebarClose>
         </div>
+      </AnimatedSidebarHeader>
 
-        {/* Rodapé do Usuário Logado */}
-        <div className="border-t border-slate-100 pt-4">
-          <div className="flex items-center justify-between px-2">
-            <div className="truncate pr-2">
-              <p className="text-xs font-bold text-slate-900 truncate">{nomeExibicao}</p>
-              <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 capitalize">
-                {cargoExibicao === 'ADMIN'
-                  ? 'Administrador'
-                  : cargoExibicao === 'TECNICO'
-                  ? 'Técnico'
-                  : 'Atendente'}
+      {/* Conteúdo Principal da Sidebar com rolagem independente */}
+      <AnimatedSidebarContent className="flex-1 min-h-0 overflow-y-auto px-2 pt-2 scrollbar-thin">
+        {/* Grupo 1: OPERACIONAL (Fonte ampliada e nome renovado) */}
+        <AnimatedSidebarGroup className="pt-1">
+          <AnimatedSidebarGroupLabel className="text-[#8FAFC7] text-xs font-bold uppercase tracking-wider mb-2.5 px-2">
+            OPERACIONAL
+          </AnimatedSidebarGroupLabel>
+          <AnimatedSidebarGroupContent>
+            <AnimatedSidebarMenu>
+              {/* Item: Ordens de Serviço (com Badge 14 e Submenus Kanban e Lista) */}
+              <AnimatedSidebarMenuItem>
+                <AnimatedSidebarMenuButton
+                  isActive={rotaAtual.includes('/ordens-servico') || rotaAtual === '/'}
+                  activePillClassName="bg-[#DE6C20] shadow-sm"
+                  className="text-[#9BB4CC] hover:text-white hover:bg-[#163252]"
+                  ariaExpanded={secaoAberta === 'Ordens de Serviço'}
+                  icon={<ClipboardList className="size-4 shrink-0 text-current" />}
+                  onSelect={() => {
+                    navigate(`/ordens-servico?view=${currentView}`);
+                    setSecaoAberta((prev) =>
+                      prev === 'Ordens de Serviço' ? null : 'Ordens de Serviço'
+                    );
+                  }}
+                >
+                  Ordens de Serviço
+                </AnimatedSidebarMenuButton>
+
+                <AnimatedSidebarMenuSub open={secaoAberta === 'Ordens de Serviço'} className="border-[#1B3654]">
+                  <AnimatedSidebarMenuSubItem>
+                    <AnimatedSidebarMenuSubButton
+                      icon={<Columns3 className="size-3.5 text-current" />}
+                      isActive={rotaAtual.includes('/ordens-servico') && currentView === 'kanban'}
+                      onSelect={() => navigate('/ordens-servico?view=kanban')}
+                    >
+                      Quadro Kanban
+                    </AnimatedSidebarMenuSubButton>
+                  </AnimatedSidebarMenuSubItem>
+                  <AnimatedSidebarMenuSubItem>
+                    <AnimatedSidebarMenuSubButton
+                      icon={<List className="size-3.5 text-current" />}
+                      isActive={rotaAtual.includes('/ordens-servico') && currentView === 'tabela'}
+                      onSelect={() => navigate('/ordens-servico?view=tabela')}
+                    >
+                      Lista Tabular
+                    </AnimatedSidebarMenuSubButton>
+                  </AnimatedSidebarMenuSubItem>
+                </AnimatedSidebarMenuSub>
+              </AnimatedSidebarMenuItem>
+
+              {/* Item: Clientes */}
+              <AnimatedSidebarMenuItem>
+                <AnimatedSidebarMenuButton
+                  isActive={rotaAtual.includes('/clientes')}
+                  activePillClassName="bg-[#DE6C20] shadow-sm"
+                  className="text-[#9BB4CC] hover:text-white hover:bg-[#163252]"
+                  icon={<Users className="size-4 shrink-0 text-current" />}
+                  onSelect={() => navigate('/clientes')}
+                >
+                  Clientes
+                </AnimatedSidebarMenuButton>
+              </AnimatedSidebarMenuItem>
+
+              {/* Item: Equipamentos */}
+              <AnimatedSidebarMenuItem>
+                <AnimatedSidebarMenuButton
+                  isActive={rotaAtual.includes('/equipamentos')}
+                  activePillClassName="bg-[#DE6C20] shadow-sm"
+                  className="text-[#9BB4CC] hover:text-white hover:bg-[#163252]"
+                  icon={<Laptop className="size-4 shrink-0 text-current" />}
+                  onSelect={() => navigate('/equipamentos')}
+                >
+                  Equipamentos
+                </AnimatedSidebarMenuButton>
+              </AnimatedSidebarMenuItem>
+
+              {/* Item: Peças & Produtos */}
+              <AnimatedSidebarMenuItem>
+                <AnimatedSidebarMenuButton
+                  isActive={rotaAtual.includes('/produtos')}
+                  activePillClassName="bg-[#DE6C20] shadow-sm"
+                  className="text-[#9BB4CC] hover:text-white hover:bg-[#163252]"
+                  icon={<Package className="size-4 shrink-0 text-current" />}
+                  onSelect={() => navigate('/produtos')}
+                >
+                  Peças & Produtos
+                </AnimatedSidebarMenuButton>
+              </AnimatedSidebarMenuItem>
+            </AnimatedSidebarMenu>
+          </AnimatedSidebarGroupContent>
+        </AnimatedSidebarGroup>
+
+        {/* Grupo 2: GESTÃO & CONTROLE (Nova Label acima de Relatórios & Métricas) */}
+        <AnimatedSidebarGroup className="pt-3 border-t border-[#1B3654]/60 mt-2">
+          <AnimatedSidebarGroupLabel className="text-[#8FAFC7] text-xs font-bold uppercase tracking-wider mb-2.5 px-2">
+            GESTÃO & CONTROLE
+          </AnimatedSidebarGroupLabel>
+          <AnimatedSidebarGroupContent>
+            <AnimatedSidebarMenu>
+              {/* Item: Relatórios & Métricas */}
+              <AnimatedSidebarMenuItem>
+                <AnimatedSidebarMenuButton
+                  isActive={rotaAtual.includes('/relatorios')}
+                  activePillClassName="bg-[#DE6C20] shadow-sm"
+                  className="text-[#9BB4CC] hover:text-white hover:bg-[#163252]"
+                  icon={<BarChart3 className="size-4 shrink-0 text-current" />}
+                  onSelect={() => navigate('/relatorios')}
+                >
+                  Relatórios & Métricas
+                </AnimatedSidebarMenuButton>
+              </AnimatedSidebarMenuItem>
+
+              {/* Item: Usuário (Apenas ADMIN) */}
+              {ehAdmin && (
+                <AnimatedSidebarMenuItem>
+                  <AnimatedSidebarMenuButton
+                    isActive={rotaAtual.includes('/usuarios')}
+                    activePillClassName="bg-[#DE6C20] shadow-sm"
+                    className="text-[#9BB4CC] hover:text-white hover:bg-[#163252]"
+                    icon={<UserCheck className="size-4 shrink-0 text-current" />}
+                    onSelect={() => navigate('/usuarios')}
+                  >
+                    Usuário
+                  </AnimatedSidebarMenuButton>
+                </AnimatedSidebarMenuItem>
+              )}
+
+              {/* Item: Auditoria de Logs */}
+              {ehAdmin && (
+                <AnimatedSidebarMenuItem>
+                  <AnimatedSidebarMenuButton
+                    isActive={rotaAtual.includes('/auditoria')}
+                    activePillClassName="bg-[#DE6C20] shadow-sm"
+                    className="text-[#9BB4CC] hover:text-white hover:bg-[#163252]"
+                    icon={<ShieldAlert className="size-4 shrink-0 text-current" />}
+                    onSelect={() => navigate('/auditoria')}
+                  >
+                    Auditoria de Logs
+                  </AnimatedSidebarMenuButton>
+                </AnimatedSidebarMenuItem>
+              )}
+            </AnimatedSidebarMenu>
+          </AnimatedSidebarGroupContent>
+        </AnimatedSidebarGroup>
+      </AnimatedSidebarContent>
+
+      {/* Rodapé Fixo com Card de Perfil Operador (Permanente em todas as telas) */}
+      <AnimatedSidebarFooter className="shrink-0 mt-auto border-t border-[#1B3654]/80 p-2.5 bg-[#0D223A] z-10">
+        <div className="rounded-xl bg-[#091B30] border border-[#163252] p-2.5 space-y-2">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[#1D3B5E] text-xs font-bold text-white shadow-xs">
+              {iniciaisUsuario}
+            </span>
+            <div className="min-w-0 flex-1 group-data-[state=collapsed]/sidebar:hidden">
+              <p className="truncate text-xs font-bold text-white leading-tight">
+                {nomeExibicao}
+              </p>
+              <span className="inline-block rounded bg-[#142A42] px-1.5 py-0.5 text-[9px] font-semibold text-[#8FAFC7] uppercase tracking-wider">
+                {cargoFormatado}
               </span>
             </div>
             <button
+              type="button"
               onClick={acaoSair}
               title="Sair do sistema"
-              className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
+              className="p-1.5 text-[#8FAFC7] hover:text-[#DE6C20] hover:bg-[#163252] rounded-lg transition-colors group-data-[state=collapsed]/sidebar:hidden"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="size-4" />
             </button>
           </div>
         </div>
-      </aside>
-    </>
+      </AnimatedSidebarFooter>
+
+      {/* Trilho de recolhimento no Desktop */}
+      <AnimatedSidebarRail />
+    </AnimatedSidebar>
   );
 };
 

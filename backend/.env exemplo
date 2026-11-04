@@ -3,8 +3,8 @@ NODE_ENV=development
 
 # Configuração do Microsoft SQL Server (Localhost)
 DB_USER=sa
-DB_PASSWORD=SuaSenhaForte123!
-DB_SERVER=localhost
+DB_PASSWORD=123
+DB_SERVER=localhost\SQLEXPRESS
 DB_DATABASE=mediator_db
 DB_PORT=1433
 

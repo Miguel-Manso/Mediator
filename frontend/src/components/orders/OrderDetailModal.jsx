@@ -20,13 +20,14 @@ import {
   History,
   Filter,
   Check,
+  Copy,
   Download,
   Lock,
   Search,
   ShieldAlert,
 } from 'lucide-react';
 import { api } from '../../services/api';
-import { maskCurrency } from '../../utils/masks';
+import { maskCurrency, formatDateTimeBR } from '../../utils/masks';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSocket } from '../../contexts/SocketContext';
 import { OrderTimeline } from './OrderTimeline';
@@ -73,6 +74,10 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
   const [salvandoPeca, setSalvandoPeca] = useState(false);
   const [salvandoBaixa, setSalvandoBaixa] = useState(false);
   const [erroPeca, setErroPeca] = useState('');
+
+  // Estados de Ações da OS Concluída (Resumo e WhatsApp)
+  const [resumoCopiado, setResumoCopiado] = useState(false);
+  const [copiandoResumo, setCopiandoResumo] = useState(false);
 
   // Carrega detalhes da OS e dados auxiliares
   const carregarDetalhes = async () => {
@@ -481,6 +486,177 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
     };
   };
 
+  // Identifica se a OS está na etapa final ("Concluída")
+  const statusNome = (ordem?.statusNome || '').toLowerCase();
+  const ehCancelado = statusNome.includes('cancel') || Number(ordem?.statusId) === 9;
+  const ehConcluida = Boolean(ordem) && !ehCancelado && (
+    statusNome.includes('concluíd') ||
+    statusNome.includes('concluid') ||
+    statusNome.includes('finaliz') ||
+    statusNome.includes('entregue') ||
+    Number(ordem?.statusId) === 7 ||
+    Number(ordem?.statusId) === 8 ||
+    Boolean(ordem?.fechadoEm)
+  );
+
+  // 1. Compila os dados da OS em um resumo limpo e bem formatado
+  const gerarTextoResumo = () => {
+    if (!ordem) return '';
+
+    const valorTotalNum = ordem.valorTotal !== undefined
+      ? Number(ordem.valorTotal)
+      : Number(ordem.totalProdutos || 0);
+
+    const valorTotalFormatado = maskCurrency(valorTotalNum);
+
+    const dataFechamento = formatDateTimeBR(ordem.fechadoEm || new Date());
+
+    const equipamentoInfo = [
+      ordem.equipamentoDescricao,
+      ordem.marcaNome ? `(${ordem.marcaNome}${ordem.modeloNome ? ` ${ordem.modeloNome}` : ''})` : null,
+      ordem.equipamentoNumeroSerie ? `[N/S: ${ordem.equipamentoNumeroSerie}]` : null,
+    ].filter(Boolean).join(' ');
+
+    // Seção de Laudo Técnico e Observações
+    const secoesLaudo = [];
+    if (ordem.descricaoProblema) {
+      secoesLaudo.push(`• Relato / Defeito Informado:\n  ${ordem.descricaoProblema}`);
+    }
+    if (ordem.laudoTecnico) {
+      secoesLaudo.push(`• Parecer Técnico / Testes Realizados:\n  ${ordem.laudoTecnico}`);
+    }
+    if (ordem.observacoesAtendimento) {
+      secoesLaudo.push(`• Observações de Atendimento / Entrada:\n  ${ordem.observacoesAtendimento}`);
+    }
+
+    // Questionário de Triagem (se existente)
+    if (ordem.perguntasTriagem && typeof ordem.perguntasTriagem === 'object') {
+      const entradasTriagem = Object.entries(ordem.perguntasTriagem)
+        .filter(([_, v]) => v && String(v).trim() !== '' && String(v).trim().toUpperCase() !== 'N/E')
+        .map(([k, v]) => `  - ${k}: ${v}`);
+      if (entradasTriagem.length > 0) {
+        secoesLaudo.push(`• Questionário de Triagem:\n${entradasTriagem.join('\n')}`);
+      }
+    }
+
+    const textoLaudoFinal = secoesLaudo.length > 0
+      ? secoesLaudo.join('\n\n')
+      : 'Nenhuma observação ou laudo técnico registrado.';
+
+    // Seção de Produtos / Peças Adicionadas
+    let textoProdutos = '';
+    if (ordem.itens && ordem.itens.length > 0) {
+      const linhasItens = ordem.itens.map((it, idx) => {
+        const precoUn = maskCurrency(it.precoUnitario);
+        const sub = maskCurrency(it.subtotal);
+        return `  ${idx + 1}. ${it.produtoNome} — ${it.quantidade}x ${precoUn} (Subtotal: ${sub})`;
+      });
+      textoProdutos = `${linhasItens.join('\n')}\n  Subtotal Peças/Insumos: ${maskCurrency(ordem.totalProdutos || 0)}`;
+    } else {
+      textoProdutos = '  Nenhuma peça ou produto adicionado a esta OS.';
+    }
+
+    return `==================================================
+RESUMO DA ORDEM DE SERVIÇO: ${ordem.numeroOrdem || ''}
+==================================================
+Status: ${ordem.statusNome || 'Concluída'}
+Data de Conclusão: ${dataFechamento}
+Cliente: ${ordem.clienteNome || 'Não informado'} ${ordem.clienteTelefone ? `(${ordem.clienteTelefone})` : ''}
+Equipamento: ${equipamentoInfo || 'Não informado'}
+Técnico Responsável: ${ordem.tecnicoNome || 'Não atribuído'}
+Atendente: ${ordem.atendenteNome || 'Não informado'}
+
+--------------------------------------------------
+1. LAUDO TÉCNICO E OBSERVAÇÕES
+--------------------------------------------------
+${textoLaudoFinal}
+
+--------------------------------------------------
+2. PRODUTOS E PEÇAS UTILIZADAS
+--------------------------------------------------
+${textoProdutos}
+
+==================================================
+VALOR TOTAL FINAL DA OS: ${valorTotalFormatado}
+==================================================`;
+  };
+
+  // Copia resumo formatado para a área de transferência usando navigator.clipboard.writeText
+  const aoCopiarResumo = async () => {
+    try {
+      setCopiandoResumo(true);
+      setErro('');
+      const texto = gerarTextoResumo();
+
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(texto);
+      } else {
+        // Fallback para navegadores sem API Clipboard moderna
+        const area = document.createElement('textarea');
+        area.value = texto;
+        area.style.position = 'fixed';
+        area.style.left = '-9999px';
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand('copy');
+        document.body.removeChild(area);
+      }
+
+      setResumoCopiado(true);
+      setSucessoMsg('Resumo da Ordem de Serviço copiado com sucesso para a área de transferência!');
+      setTimeout(() => {
+        setResumoCopiado(false);
+        setSucessoMsg('');
+      }, 4000);
+    } catch (err) {
+      console.error('Falha ao copiar resumo:', err);
+      setErro('Não foi possível copiar o resumo automaticamente para a área de transferência.');
+    } finally {
+      setCopiandoResumo(false);
+    }
+  };
+
+  // 2. Notificação do Cliente via API oficial do WhatsApp (wa.me)
+  const aoAvisarClienteWhatsApp = () => {
+    setErro('');
+    if (!ordem?.clienteTelefone) {
+      setErro('O cliente desta Ordem de Serviço não possui número de telefone cadastrado.');
+      return;
+    }
+
+    // Higieniza telefone: extrai somente dígitos (remove parênteses, traços, espaços)
+    let apenasDigitos = String(ordem.clienteTelefone).replace(/\D/g, '');
+
+    if (!apenasDigitos) {
+      setErro('Número de telefone do cliente inválido ou não informado.');
+      return;
+    }
+
+    // Se tiver 10 ou 11 dígitos (DDD + telefone brasileiro), prefixa com o código DDI do Brasil (55)
+    if (apenasDigitos.length === 10 || apenasDigitos.length === 11) {
+      apenasDigitos = `55${apenasDigitos}`;
+    }
+
+    const valorTotalFormatado = maskCurrency(
+      ordem.valorTotal !== undefined ? ordem.valorTotal : (ordem.totalProdutos || 0)
+    );
+
+    const mensagemWhatsApp = `Olá, *${ordem.clienteNome || 'Cliente'}*! 👋
+
+Temos uma ótima notícia: a sua Ordem de Serviço *${ordem.numeroOrdem}* foi *CONCLUÍDA* com sucesso! 🎉
+
+📱 *Equipamento:* ${ordem.equipamentoDescricao || 'Equipamento'}${ordem.marcaNome ? ` (${ordem.marcaNome}${ordem.modeloNome ? ` ${ordem.modeloNome}` : ''})` : ''}
+💰 *Valor Total Final:* ${valorTotalFormatado}
+${ordem.laudoTecnico ? `\n📋 *Laudo do Técnico:*\n${ordem.laudoTecnico}\n` : ''}
+Seu equipamento já está pronto para retirada. Caso tenha qualquer dúvida, estamos à disposição!`;
+
+    const urlWhatsApp = `https://wa.me/${apenasDigitos}?text=${encodeURIComponent(mensagemWhatsApp)}`;
+
+    window.open(urlWhatsApp, '_blank', 'noopener,noreferrer');
+    setSucessoMsg('WhatsApp do cliente aberto em uma nova aba com a mensagem de conclusão!');
+    setTimeout(() => setSucessoMsg(''), 4000);
+  };
+
   if (!aberto) return null;
 
   return typeof document !== 'undefined' ? createPortal(
@@ -636,7 +812,7 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
                     )}
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    Aberto em: {new Date(ordem.abertoEm).toLocaleString('pt-BR')}
+                    Aberto em: {formatDateTimeBR(ordem.abertoEm)}
                   </p>
                 </div>
 
@@ -684,6 +860,68 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
                 )}
               </div>
             </div>
+
+            {/* Bloco de Ações Especiais para OS Concluída (Resumo & WhatsApp) */}
+            {ehConcluida && (
+              <div className="rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-teal-50/70 to-emerald-50 p-4 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-start sm:items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-900">
+                          Ordem de Serviço Concluída
+                        </h4>
+                        <span className="rounded bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-2xs">
+                          Pronto para Entrega
+                        </span>
+                      </div>
+                      <p className="text-xs text-emerald-800 mt-0.5">
+                        Compile os dados técnicos para exportação em outros sistemas ou notifique o cliente pelo WhatsApp.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-200/60">
+                    {/* Botão Gerar Resumo */}
+                    <button
+                      type="button"
+                      onClick={aoCopiarResumo}
+                      disabled={copiandoResumo}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-3.5 py-2 text-xs font-bold text-emerald-800 shadow-2xs transition hover:bg-emerald-50 hover:border-emerald-400 active:scale-95 disabled:opacity-50"
+                      title="Copiar dados formatados da OS para a área de transferência"
+                    >
+                      {resumoCopiado ? (
+                        <>
+                          <Check className="h-4 w-4 text-emerald-600" />
+                          <span className="text-emerald-700">Resumo Copiado!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4 text-emerald-700" />
+                          <span>Gerar Resumo</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Botão Avisar Cliente (WhatsApp) */}
+                    <button
+                      type="button"
+                      onClick={aoAvisarClienteWhatsApp}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#25D366] px-3.5 py-2 text-xs font-bold text-white shadow-2xs transition hover:bg-[#20bd5a] hover:shadow-xs active:scale-95"
+                      title="Enviar mensagem oficial de conclusão no WhatsApp do cliente"
+                    >
+                      <svg className="h-4 w-4 fill-current shrink-0" viewBox="0 0 24 24">
+                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+                      </svg>
+                      <span>Avisar Cliente</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Abas de Navegação Responsivas com ExpandableTabs */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
@@ -1102,7 +1340,7 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
                                   <div>
                                     <span
                                       className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200"
-                                      title={it.baixadoEm ? `Baixado em: ${new Date(it.baixadoEm).toLocaleString('pt-BR')}` : ''}
+                                      title={it.baixadoEm ? `Baixado em: ${formatDateTimeBR(it.baixadoEm)}` : ''}
                                     >
                                       <CheckCircle2 className="h-3 w-3" />
                                       Baixado no Estoque
@@ -1146,11 +1384,49 @@ export const OrderDetailModal = ({ ordemId, aberto, aoFechar, aoAtualizar }) => 
         )}
 
         {/* Rodapé Fixo do Modal */}
-        <div className="flex items-center justify-end border-t border-slate-100 px-5 py-3.5 sm:px-6 bg-slate-50/75 flex-shrink-0">
+        <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-3 border-t border-slate-100 px-5 py-3.5 sm:px-6 bg-slate-50/75 flex-shrink-0">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {ehConcluida && (
+              <>
+                <button
+                  type="button"
+                  onClick={aoCopiarResumo}
+                  disabled={copiandoResumo}
+                  className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:border-slate-400 active:scale-95 disabled:opacity-50"
+                  title="Copiar dados formatados da OS para a área de transferência"
+                >
+                  {resumoCopiado ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-emerald-600" />
+                      <span className="text-emerald-700 font-bold">Copiado!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5 text-slate-500" />
+                      <span>Gerar Resumo</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={aoAvisarClienteWhatsApp}
+                  className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-1.5 rounded-lg bg-[#25D366] px-3.5 py-2 text-xs font-bold text-white shadow-2xs transition hover:bg-[#20bd5a] hover:shadow-xs active:scale-95"
+                  title="Enviar mensagem oficial de conclusão no WhatsApp do cliente"
+                >
+                  <svg className="h-3.5 w-3.5 fill-current shrink-0" viewBox="0 0 24 24">
+                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+                  </svg>
+                  <span>Avisar Cliente</span>
+                </button>
+              </>
+            )}
+          </div>
+
           <button
             type="button"
             onClick={aoFechar}
-            className="rounded-lg bg-[#0D223A] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#081524]"
+            className="w-full sm:w-auto rounded-lg bg-[#0D223A] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#081524]"
           >
             Fechar Detalhes
           </button>

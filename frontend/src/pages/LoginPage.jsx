@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Info, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import AuroraBackground from '../components/ui/aurora-background';
@@ -26,12 +26,6 @@ export const LoginPage = () => {
     } finally {
       setCarregando(false);
     }
-  };
-
-  const loginRapido = (emailDemonstracao, senhaDemonstracao) => {
-    setEmail(emailDemonstracao);
-    setSenha(senhaDemonstracao);
-    setErro('');
   };
 
   // Cores adaptadas à paleta oficial do Mediator: Laranja (#DE6C20) e Azul Escuro (#0D223A / #2A4B6E)
@@ -112,52 +106,6 @@ export const LoginPage = () => {
             )}
           </button>
         </form>
-
-        {/* Credenciais Originais de Acesso Rápido */}
-        <div className="mt-6 w-full border-t border-[#D2DFEC]/60 pt-4">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-[#437194] mb-2.5">
-            <Info className="h-4 w-4 text-[#2A4B6E]" />
-            <span>Contas de Acesso Rápido:</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => loginRapido('admin@mediator.com', 'admin123')}
-              className="rounded-lg border border-[#D2DFEC] bg-[#F0F5FA] p-2 text-left hover:bg-[#E0ECF6] hover:border-[#2A4B6E]/40 transition"
-            >
-              <div className="font-bold text-[#14253D] text-[11px]">Admin (Rocha)</div>
-              <div className="text-[10px] text-[#557390]">admin123</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => loginRapido('miguel@mediator.com', 'admin123')}
-              className="rounded-lg border border-[#D2DFEC] bg-[#F0F5FA] p-2 text-left hover:bg-[#E0ECF6] hover:border-[#2A4B6E]/40 transition"
-            >
-              <div className="font-bold text-[#14253D] text-[11px]">Miguel (Admin)</div>
-              <div className="text-[10px] text-[#557390]">admin123</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => loginRapido('ana@mediator.com', '123456')}
-              className="rounded-lg border border-[#D2DFEC] bg-[#F0F5FA] p-2 text-left hover:bg-[#E0ECF6] hover:border-[#2A4B6E]/40 transition"
-            >
-              <div className="font-bold text-[#14253D] text-[11px]">Ana (Atendente)</div>
-              <div className="text-[10px] text-[#557390]">123456</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => loginRapido('carlos@mediator.com', '123456')}
-              className="rounded-lg border border-[#D2DFEC] bg-[#F0F5FA] p-2 text-left hover:bg-[#E0ECF6] hover:border-[#2A4B6E]/40 transition"
-            >
-              <div className="font-bold text-[#14253D] text-[11px]">Carlos (Técnico)</div>
-              <div className="text-[10px] text-[#557390]">123456</div>
-            </button>
-          </div>
-        </div>
       </div>
     </AuroraBackground>
   );

@@ -25,7 +25,7 @@ import {
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../services/api';
 import { updateOSStatus } from '../services/orderService';
-import { maskCurrency } from '../utils/masks';
+import { maskCurrency, formatDateBR } from '../utils/masks';
 import { useAuth } from '../contexts/AuthContext';
 import { verificarPermissaoDrop } from '../utils/orderPermissions';
 import { OrderCreateModal } from '../components/orders/OrderCreateModal';
@@ -899,7 +899,7 @@ export const OrdersPage = () => {
 
                       {/* Abertura */}
                       <td className="px-5 py-3.5 text-slate-500 text-[11px] whitespace-nowrap">
-                        {new Date(os.abertoEm).toLocaleDateString('pt-BR')}
+                        {formatDateBR(os.abertoEm)}
                       </td>
 
                       {/* Ações */}

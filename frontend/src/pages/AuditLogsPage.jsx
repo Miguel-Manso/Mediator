@@ -21,6 +21,7 @@ import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Pagination } from '../components/common/Pagination';
 import { SearchableCombobox } from '../components/common/SearchableCombobox';
+import { formatDateTimeBR } from '../utils/masks';
 
 export const AuditLogsPage = () => {
   const { ehAdmin, cargo } = useAuth();
@@ -125,20 +126,7 @@ export const AuditLogsPage = () => {
   };
 
   const formatarDataHora = (dataStr) => {
-    if (!dataStr) return '-';
-    try {
-      const data = new Date(dataStr);
-      return data.toLocaleString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      });
-    } catch (e) {
-      return dataStr;
-    }
+    return formatDateTimeBR(dataStr);
   };
 
   const badgeMetodo = (metodo) => {

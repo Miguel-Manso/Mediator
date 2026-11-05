@@ -18,7 +18,7 @@ import {
   CheckCircle2,
   GripVertical,
 } from 'lucide-react';
-import { maskCurrency } from '../../utils/masks';
+import { maskCurrency, formatDateBR } from '../../utils/masks';
 
 // Função para inferir o ícone adequado para o equipamento
 const getEquipamentoIcone = (descricao = '', categoria = '') => {
@@ -62,10 +62,8 @@ export const OrderKanbanCard = React.memo(({
 
   const IconeEquipamento = getEquipamentoIcone(os.equipamentoDescricao, os.categoriaNome);
 
-  // Formatação da data
-  const dataAbertura = os.abertoEm
-    ? new Date(os.abertoEm).toLocaleDateString('pt-BR')
-    : '--/--/----';
+  // Formatação da data no fuso horário brasileiro
+  const dataAbertura = os.abertoEm ? formatDateBR(os.abertoEm) : '--/--/----';
 
   const copiarNumero = (e) => {
     e.stopPropagation();

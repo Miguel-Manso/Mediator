@@ -13,6 +13,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { formatDateTimeBR } from '../../utils/masks';
 
 /**
  * Componente de Linha do Tempo / Evolução Técnica da Ordem de Serviço.
@@ -106,22 +107,9 @@ export const OrderTimeline = ({
     return true;
   });
 
-  // Formatador seguro de data e hora para pt-BR
+  // Formatador seguro de data e hora para pt-BR no fuso horário do Brasil (America/Sao_Paulo)
   const formatarDataHora = (dataIso) => {
-    if (!dataIso) return '-';
-    try {
-      const d = new Date(dataIso);
-      if (isNaN(d.getTime())) return String(dataIso);
-      return d.toLocaleString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return String(dataIso);
-    }
+    return formatDateTimeBR(dataIso);
   };
 
   return (

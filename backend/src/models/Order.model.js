@@ -222,7 +222,12 @@ class OrderModel {
           SELECT SUM(po.quantidade * po.preco_unitario)
           FROM produtos_ordem po
           WHERE po.ordem_id = os.id AND po.ativo = 1
-        ), 0.00) AS totalProdutos
+        ), 0.00) AS totalProdutos,
+        ISNULL((
+          SELECT SUM(po.quantidade * po.preco_unitario)
+          FROM produtos_ordem po
+          WHERE po.ordem_id = os.id AND po.ativo = 1
+        ), 0.00) AS valorTotal
       FROM ordens_servico os
       JOIN status_ordem st ON st.id = os.status_id
       JOIN clientes c ON c.id = os.cliente_id
@@ -348,6 +353,7 @@ class OrderModel {
 
     ordem.itens = itensRes.recordset;
     ordem.totalProdutos = itensRes.recordset.reduce((acc, item) => acc + Number(item.subtotal || 0), 0);
+    ordem.valorTotal = Number(ordem.totalProdutos.toFixed(2));
 
     // 3. Histórico de evolução técnica e etapas
     const histRes = await pool

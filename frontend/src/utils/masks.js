@@ -92,3 +92,54 @@ export const maskCurrencyInput = (value) => {
     maximumFractionDigits: 2,
   }).format(numberValue);
 };
+
+/**
+ * Formata data e hora garantindo estritamente o fuso horário brasileiro (America/Sao_Paulo - UTC-3).
+ * @param {string|Date} value
+ * @param {Intl.DateTimeFormatOptions} [options]
+ * @returns {string}
+ */
+export const formatDateTimeBR = (value, options = {}) => {
+  if (!value) return '-';
+  try {
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return String(value);
+
+    return date.toLocaleString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      ...options,
+    });
+  } catch (e) {
+    return String(value);
+  }
+};
+
+/**
+ * Formata data (dia/mês/ano) garantindo o fuso horário brasileiro (America/Sao_Paulo - UTC-3).
+ * @param {string|Date} value
+ * @param {Intl.DateTimeFormatOptions} [options]
+ * @returns {string}
+ */
+export const formatDateBR = (value, options = {}) => {
+  if (!value) return '-';
+  try {
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return String(value);
+
+    return date.toLocaleDateString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      ...options,
+    });
+  } catch (e) {
+    return String(value);
+  }
+};
